@@ -1,0 +1,62 @@
+[
+  {
+    "cognitoUsername": "jane.doe@university.edu",
+    "role": "EDUCATOR",
+    "lastName": "Doe",
+    "userId": "b5e92fd6-7c63-431c-ba20-92472a5914b2",
+    "updatedAt": "1768251413",
+    "status": "pending",
+    "createdAt": "1768251413",
+    "id": "b5e92fd6-7c63-431c-ba20-92472a5914b2",
+    "email": "jane.doe@university.edu",
+    "firstName": "Jane"
+  },
+  {
+    "cognitoUsername": "admin@university.edu",
+    "role": "ADMIN",
+    "lastName": "User",
+    "userId": "fe9c03f7-bcfa-46c5-ae7c-5a5fda30e589",
+    "updatedAt": "1768251409",
+    "status": "pending",
+    "createdAt": "1768251409",
+    "id": "fe9c03f7-bcfa-46c5-ae7c-5a5fda30e589",
+    "email": "admin@university.edu",
+    "firstName": "Admin"
+  },
+  {
+    "cognitoUsername": "john.smith@university.edu",
+    "role": "EDUCATOR",
+    "lastName": "Smith",
+    "userId": "857c5201-7382-4c16-8452-a4a7d461a3a7",
+    "updatedAt": "1768251411",
+    "status": "pending",
+    "createdAt": "1768251411",
+    "id": "857c5201-7382-4c16-8452-a4a7d461a3a7",
+    "email": "john.smith@university.edu",
+    "firstName": "John"
+  },
+  {
+    "cognitoUsername": "student1@student.university.edu",
+    "role": "STUDENT",
+    "lastName": "One",
+    "userId": "352e7715-cb19-4434-a932-e880b5c72b4a",
+    "updatedAt": "1768251416",
+    "status": "pending",
+    "createdAt": "1768251416",
+    "id": "352e7715-cb19-4434-a932-e880b5c72b4a",
+    "email": "student1@student.university.edu",
+    "firstName": "Student"
+  },
+  {
+    "cognitoUsername": "student2@student.university.edu",
+    "role": "STUDENT",
+    "lastName": "Two",
+    "userId": "df736fcc-f878-4b7f-9cce-692406000b47",
+    "updatedAt": "1768251419",
+    "status": "pending",
+    "createdAt": "1768251419",
+    "id": "df736fcc-f878-4b7f-9cce-692406000b47",
+    "email": "student2@student.university.edu",
+    "firstName": "Student"
+  }
+]

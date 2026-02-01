@@ -1,0 +1,317 @@
+AWSTemplateFormatVersion: '2010-09-09'
+Description: |
+  TutorVerse AI Features - Standalone Deployment Stack
+  
+  This stack ONLY deploys API Gateway resources for AI features.
+  It does NOT modify existing resources from aitutor-complete.yaml
+  
+  Prerequisites:
+  - Main stack (aitutor-complete.yaml) must be deployed first
+  - Lambda functions already exist from main stack
+  - DynamoDB tables already exist from main stack
+  
+  This stack references existing resources by name/ARN
+  Safe to deploy/redeploy without affecting main infrastructure
+
+Parameters:
+  EnvironmentName:
+    Type: String
+    Default: development
+    AllowedValues:
+      - development
+      - staging
+      - production
+    Description: Deployment environment (must match main stack)
+
+  RegionName:
+    Type: String
+    Default: us-east-2
+    Description: AWS region (must match main stack)
+
+  AccountId:
+    Type: String
+    NoEcho: true
+    Description: AWS Account ID (must match main stack)
+
+  ApiGatewayId:
+    Type: String
+    Description: Existing API Gateway ID from main stack (e.g., abc123def)
+
+  ApiGatewayRootId:
+    Type: String
+    Description: API Gateway root resource ID from main stack
+
+Metadata:
+  AWS::CloudFormation::Interface:
+    ParameterGroups:
+      - Label:
+          default: Environment Configuration
+        Parameters:
+          - EnvironmentName
+          - RegionName
+          - AccountId
+      - Label:
+          default: Existing API Gateway
+        Parameters:
+          - ApiGatewayId
+          - ApiGatewayRootId
+
+Conditions:
+  IsProduction: !Equals [!Ref EnvironmentName, production]
+  IsStaging: !Equals [!Ref EnvironmentName, staging]
+  IsDevelopment: !Equals [!Ref EnvironmentName, development]
+
+Resources:
+  # ==================== API GATEWAY RESOURCES ====================
+  # /api resource
+  ApiResource:
+    Type: AWS::ApiGateway::Resource
+    Properties:
+      RestApiId: !Ref ApiGatewayId
+      ParentId: !Ref ApiGatewayRootId
+      PathPart: api
+
+  # /api/chat resource
+  ChatResource:
+    Type: AWS::ApiGateway::Resource
+    Properties:
+      RestApiId: !Ref ApiGatewayId
+      ParentId: !GetAtt ApiResource.ResourceId
+      PathPart: chat
+
+  # /api/chat/{sessionId} resource
+  ChatSessionIdResource:
+    Type: AWS::ApiGateway::Resource
+    Properties:
+      RestApiId: !Ref ApiGatewayId
+      ParentId: !GetAtt ChatResource.ResourceId
+      PathPart: '{sessionId}'
+
+  # /api/chat/{sessionId}/messages resource
+  ChatMessagesResource:
+    Type: AWS::ApiGateway::Resource
+    Properties:
+      RestApiId: !Ref ApiGatewayId
+      ParentId: !GetAtt ChatSessionIdResource.ResourceId
+      PathPart: messages
+
+  # /api/quiz resource
+  QuizResource:
+    Type: AWS::ApiGateway::Resource
+    Properties:
+      RestApiId: !Ref ApiGatewayId
+      ParentId: !GetAtt ApiResource.ResourceId
+      PathPart: quiz
+
+  # /api/quiz/generate resource
+  QuizGenerateResource:
+    Type: AWS::ApiGateway::Resource
+    Properties:
+      RestApiId: !Ref ApiGatewayId
+      ParentId: !GetAtt QuizResource.ResourceId
+      PathPart: generate
+
+  # /api/quiz/{quizId} resource
+  QuizIdResource:
+    Type: AWS::ApiGateway::Resource
+    Properties:
+      RestApiId: !Ref ApiGatewayId
+      ParentId: !GetAtt QuizResource.ResourceId
+      PathPart: '{quizId}'
+
+  # /api/quiz/{quizId}/submit resource
+  QuizSubmitResource:
+    Type: AWS::ApiGateway::Resource
+    Properties:
+      RestApiId: !Ref ApiGatewayId
+      ParentId: !GetAtt QuizIdResource.ResourceId
+      PathPart: submit
+
+  # /api/summary resource
+  SummaryResource:
+    Type: AWS::ApiGateway::Resource
+    Properties:
+      RestApiId: !Ref ApiGatewayId
+      ParentId: !GetAtt ApiResource.ResourceId
+      PathPart: summary
+
+  # /api/summary/generate resource
+  SummaryGenerateResource:
+    Type: AWS::ApiGateway::Resource
+    Properties:
+      RestApiId: !Ref ApiGatewayId
+      ParentId: !GetAtt SummaryResource.ResourceId
+      PathPart: generate
+
+  # ==================== API METHODS ====================
+  # NOTE: Actual method definitions (POST, GET, DELETE) would reference
+  # existing Lambda functions from the main stack via !Sub
+  # Format example:
+  #   arn:aws:apigateway:region:lambda:path/2015-03-31/functions/arn:aws:lambda:region:account-id:function:function-name/invocations
+
+  ChatPostMethod:
+    Type: AWS::ApiGateway::Method
+    Properties:
+      RestApiId: !Ref ApiGatewayId
+      ResourceId: !GetAtt ChatResource.ResourceId
+      HttpMethod: POST
+      AuthorizationType: AWS_IAM
+      Integration:
+        Type: AWS_PROXY
+        IntegrationHttpMethod: POST
+        Uri: !Sub 'arn:aws:apigateway:${AWS::Region}:lambda:path/2015-03-31/functions/arn:aws:lambda:${AWS::Region}:${AWS::AccountId}:function:tutorverse-ai-chat-create-${EnvironmentName}/invocations'
+
+  ChatGetMethod:
+    Type: AWS::ApiGateway::Method
+    Properties:
+      RestApiId: !Ref ApiGatewayId
+      ResourceId: !GetAtt ChatResource.ResourceId
+      HttpMethod: GET
+      AuthorizationType: AWS_IAM
+      Integration:
+        Type: AWS_PROXY
+        IntegrationHttpMethod: POST
+        Uri: !Sub 'arn:aws:apigateway:${AWS::Region}:lambda:path/2015-03-31/functions/arn:aws:lambda:${AWS::Region}:${AWS::AccountId}:function:tutorverse-ai-chat-list-${EnvironmentName}/invocations'
+
+  ChatSessionGetMethod:
+    Type: AWS::ApiGateway::Method
+    Properties:
+      RestApiId: !Ref ApiGatewayId
+      ResourceId: !GetAtt ChatSessionIdResource.ResourceId
+      HttpMethod: GET
+      AuthorizationType: AWS_IAM
+      Integration:
+        Type: AWS_PROXY
+        IntegrationHttpMethod: POST
+        Uri: !Sub 'arn:aws:apigateway:${AWS::Region}:lambda:path/2015-03-31/functions/arn:aws:lambda:${AWS::Region}:${AWS::AccountId}:function:tutorverse-ai-chat-get-${EnvironmentName}/invocations'
+
+  ChatSessionDeleteMethod:
+    Type: AWS::ApiGateway::Method
+    Properties:
+      RestApiId: !Ref ApiGatewayId
+      ResourceId: !GetAtt ChatSessionIdResource.ResourceId
+      HttpMethod: DELETE
+      AuthorizationType: AWS_IAM
+      Integration:
+        Type: AWS_PROXY
+        IntegrationHttpMethod: POST
+        Uri: !Sub 'arn:aws:apigateway:${AWS::Region}:lambda:path/2015-03-31/functions/arn:aws:lambda:${AWS::Region}:${AWS::AccountId}:function:tutorverse-ai-chat-delete-${EnvironmentName}/invocations'
+
+  ChatMessagesPostMethod:
+    Type: AWS::ApiGateway::Method
+    Properties:
+      RestApiId: !Ref ApiGatewayId
+      ResourceId: !GetAtt ChatMessagesResource.ResourceId
+      HttpMethod: POST
+      AuthorizationType: AWS_IAM
+      Integration:
+        Type: AWS_PROXY
+        IntegrationHttpMethod: POST
+        Uri: !Sub 'arn:aws:apigateway:${AWS::Region}:lambda:path/2015-03-31/functions/arn:aws:lambda:${AWS::Region}:${AWS::AccountId}:function:tutorverse-ai-chat-send-${EnvironmentName}/invocations'
+
+  QuizGeneratePostMethod:
+    Type: AWS::ApiGateway::Method
+    Properties:
+      RestApiId: !Ref ApiGatewayId
+      ResourceId: !GetAtt QuizGenerateResource.ResourceId
+      HttpMethod: POST
+      AuthorizationType: AWS_IAM
+      Integration:
+        Type: AWS_PROXY
+        IntegrationHttpMethod: POST
+        Uri: !Sub 'arn:aws:apigateway:${AWS::Region}:lambda:path/2015-03-31/functions/arn:aws:lambda:${AWS::Region}:${AWS::AccountId}:function:tutorverse-ai-quiz-generate-${EnvironmentName}/invocations'
+
+  QuizGetMethod:
+    Type: AWS::ApiGateway::Method
+    Properties:
+      RestApiId: !Ref ApiGatewayId
+      ResourceId: !GetAtt QuizIdResource.ResourceId
+      HttpMethod: GET
+      AuthorizationType: AWS_IAM
+      Integration:
+        Type: AWS_PROXY
+        IntegrationHttpMethod: POST
+        Uri: !Sub 'arn:aws:apigateway:${AWS::Region}:lambda:path/2015-03-31/functions/arn:aws:lambda:${AWS::Region}:${AWS::AccountId}:function:tutorverse-ai-quiz-get-${EnvironmentName}/invocations'
+
+  QuizSubmitPostMethod:
+    Type: AWS::ApiGateway::Method
+    Properties:
+      RestApiId: !Ref ApiGatewayId
+      ResourceId: !GetAtt QuizSubmitResource.ResourceId
+      HttpMethod: POST
+      AuthorizationType: AWS_IAM
+      Integration:
+        Type: AWS_PROXY
+        IntegrationHttpMethod: POST
+        Uri: !Sub 'arn:aws:apigateway:${AWS::Region}:lambda:path/2015-03-31/functions/arn:aws:lambda:${AWS::Region}:${AWS::AccountId}:function:tutorverse-ai-quiz-submit-${EnvironmentName}/invocations'
+
+  SummaryGeneratePostMethod:
+    Type: AWS::ApiGateway::Method
+    Properties:
+      RestApiId: !Ref ApiGatewayId
+      ResourceId: !GetAtt SummaryGenerateResource.ResourceId
+      HttpMethod: POST
+      AuthorizationType: AWS_IAM
+      Integration:
+        Type: AWS_PROXY
+        IntegrationHttpMethod: POST
+        Uri: !Sub 'arn:aws:apigateway:${AWS::Region}:lambda:path/2015-03-31/functions/arn:aws:lambda:${AWS::Region}:${AWS::AccountId}:function:tutorverse-ai-summary-generate-${EnvironmentName}/invocations'
+
+  # ==================== API DEPLOYMENT ====================
+  ApiDeployment:
+    Type: AWS::ApiGateway::Deployment
+    DependsOn:
+      - ChatPostMethod
+      - ChatGetMethod
+      - ChatSessionGetMethod
+      - ChatSessionDeleteMethod
+      - ChatMessagesPostMethod
+      - QuizGeneratePostMethod
+      - QuizGetMethod
+      - QuizSubmitPostMethod
+      - SummaryGeneratePostMethod
+    Properties:
+      RestApiId: !Ref ApiGatewayId
+      StageName: !Ref EnvironmentName
+      Description: AI Features API Deployment
+
+Outputs:
+  StackName:
+    Description: Name of this CloudFormation stack
+    Value: !Ref AWS::StackName
+    Export:
+      Name: !Sub '${AWS::StackName}-StackName'
+
+  ApiGatewayId:
+    Description: API Gateway ID
+    Value: !Ref ApiGatewayId
+    Export:
+      Name: !Sub '${AWS::StackName}-ApiGatewayId'
+
+  ApiEndpoint:
+    Description: API Gateway endpoint URL
+    Value: !Sub 'https://${ApiGatewayId}.execute-api.${AWS::Region}.amazonaws.com/${EnvironmentName}'
+    Export:
+      Name: !Sub '${AWS::StackName}-ApiEndpoint'
+
+  ChatResourceId:
+    Description: /api/chat resource ID
+    Value: !GetAtt ChatResource.ResourceId
+    Export:
+      Name: !Sub '${AWS::StackName}-ChatResourceId'
+
+  QuizResourceId:
+    Description: /api/quiz resource ID
+    Value: !GetAtt QuizResource.ResourceId
+    Export:
+      Name: !Sub '${AWS::StackName}-QuizResourceId'
+
+  SummaryResourceId:
+    Description: /api/summary resource ID
+    Value: !GetAtt SummaryResource.ResourceId
+    Export:
+      Name: !Sub '${AWS::StackName}-SummaryResourceId'
+
+  DeploymentStatus:
+    Description: Status of AI Features deployment
+    Value: 'Ready - All AI API routes configured'

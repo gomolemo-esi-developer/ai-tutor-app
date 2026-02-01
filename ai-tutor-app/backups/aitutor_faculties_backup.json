@@ -1,0 +1,13 @@
+[
+  {
+    "code": "ENG",
+    "deanName": "Dr. John Smith",
+    "facultyId": "88a153da-704b-44aa-9401-c2727356a224",
+    "updatedAt": "1768251203",
+    "createdAt": "1768251203",
+    "id": "fff1949b-05d9-4fa2-888a-d6451dca7543",
+    "email": "engineering@university.edu",
+    "phone": "+1234567890",
+    "name": "Faculty of Engineering"
+  }
+]

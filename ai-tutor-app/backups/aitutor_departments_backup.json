@@ -1,0 +1,58 @@
+[
+  {
+    "headOfDepartmentName": "Dr. Jane Doe",
+    "location": "Building A, Floor 2",
+    "departmentId": "cb0068a5-54ef-4471-8d91-f177c64c0409",
+    "departmentCode": "CS",
+    "facultyId": "88a153da-704b-44aa-9401-c2727356a224",
+    "updatedAt": "1768251203",
+    "createdAt": "1768251203",
+    "id": "b0782d49-2c29-4e35-8437-cb21aa62549d",
+    "email": "cs@university.edu",
+    "phone": "+1234567890",
+    "name": "Computer Science",
+    "campusId": "60edd3ca-f49b-4f58-bc6d-a961fb1d4015"
+  },
+  {
+    "headOfDepartmentName": "Dr. Jane Doe",
+    "location": "Building A, Floor 2",
+    "departmentId": "9de8a22b-1568-4b87-b2d5-4d596d60276e",
+    "departmentCode": "CE",
+    "facultyId": "88a153da-704b-44aa-9401-c2727356a224",
+    "updatedAt": "1768251203",
+    "createdAt": "1768251203",
+    "id": "d07d34b2-5ea0-4ec4-a1f7-61cf11e5e372",
+    "email": "ce@university.edu",
+    "phone": "+1234567890",
+    "name": "Civil Engineering",
+    "campusId": "60edd3ca-f49b-4f58-bc6d-a961fb1d4015"
+  },
+  {
+    "headOfDepartmentName": "Dr. Jane Doe",
+    "location": "Building A, Floor 5",
+    "departmentId": "7ba9d575-5bf7-40a7-8759-99a86f035e0e",
+    "departmentCode": "ME",
+    "facultyId": "88a153da-704b-44aa-9401-c2727356a224",
+    "updatedAt": "1768251203",
+    "createdAt": "1768251203",
+    "id": "2cf95c53-cbbe-4c11-b07a-8e0e02fda9a9",
+    "email": "me@university.edu",
+    "phone": "+1234567890",
+    "name": "Mechanical Engineering",
+    "campusId": "60edd3ca-f49b-4f58-bc6d-a961fb1d4015"
+  },
+  {
+    "headOfDepartmentName": "Dr. Jane Doe",
+    "location": "Building A, Floor 1",
+    "departmentId": "3754af4b-1d01-4823-96af-03c9964321bc",
+    "departmentCode": "EE",
+    "facultyId": "88a153da-704b-44aa-9401-c2727356a224",
+    "updatedAt": "1768251203",
+    "createdAt": "1768251203",
+    "id": "9ff41017-1d32-4c22-bdb0-276b812e446e",
+    "email": "ee@university.edu",
+    "phone": "+1234567890",
+    "name": "Electrical Engineering",
+    "campusId": "60edd3ca-f49b-4f58-bc6d-a961fb1d4015"
+  }
+]

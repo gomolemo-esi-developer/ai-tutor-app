@@ -1,0 +1,804 @@
+import React, { useState, useEffect } from "react";
+import { useSearchParams, useNavigate } from "react-router-dom";
+import {
+    Send,
+    Plus,
+    MoreVertical,
+    Sparkles,
+    Trash2,
+    AlertCircle,
+    MessageSquare,
+} from "lucide-react";
+import MainLayout from "@/components/layout/MainLayout";
+import SelectedContentBar from "@/components/content/SelectedContentBar";
+import LoadingSpinner from "@/components/ui/loading-spinner";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { cn } from "@/lib/utils";
+import { AIMessageRenderer } from "@/components/AIMessageRenderer";
+import { useContentSelection } from "@/contexts/ContentSelectionContext";
+import { useApi } from "@/hooks/useApi";
+import { toast } from "sonner";
+import {
+    DropdownMenu,
+    DropdownMenuContent,
+    DropdownMenuItem,
+    DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
+import {
+    Select,
+    SelectContent,
+    SelectItem,
+    SelectTrigger,
+    SelectValue,
+} from "@/components/ui/select";
+import {
+    AlertDialog,
+    AlertDialogAction,
+    AlertDialogCancel,
+    AlertDialogContent,
+    AlertDialogDescription,
+    AlertDialogFooter,
+    AlertDialogHeader,
+    AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
+import {
+    Sheet,
+    SheetContent,
+    SheetHeader,
+    SheetTitle,
+    SheetTrigger,
+} from "@/components/ui/sheet";
+
+interface ChatSession {
+    id?: string;
+    chatId?: string;
+    sessionId?: string;  // Backend returns sessionId
+    title?: string;
+    topic?: string;  // Backend might use topic instead of title
+    lastMessage?: string;
+    timestamp?: string;
+    createdAt?: number;
+    updatedAt?: number;
+    moduleCode?: string;
+    moduleId?: string;
+    contentIds?: string;
+    messageCount?: number;
+}
+
+interface ChatMessage {
+    id?: string;
+    messageId?: string;
+    content: string;
+    sender: "user" | "ai";
+    timestamp?: string;
+}
+
+const funLoadingMessages = [
+    "AI Tutor is thinking...",
+    "Consulting the knowledge base...",
+    "Preparing a helpful response...",
+];
+
+const Chat: React.FC = () => {
+    const [searchParams] = useSearchParams();
+    const navigate = useNavigate();
+    const urlModuleCode = searchParams.get("moduleCode");
+    const urlContentIds = searchParams.get("contentIds");
+    const urlChatId = searchParams.get("chatId");
+
+    const { selectedContent, setSelectedContent } = useContentSelection();
+
+    // API integration
+    const {
+        get: getChats,
+        post: postChat,
+        del: deleteChat,
+        loading: apiLoading,
+    } = useApi<ChatSession[]>();
+    const { get: getMessages, post: postMessage } = useApi<ChatMessage[]>();
+
+    const [chatSessions, setChatSessions] = useState<ChatSession[]>([]);
+    const [currentChatId, setCurrentChatId] = useState<string | null>(urlChatId);
+    const [currentMessages, setCurrentMessages] = useState<ChatMessage[]>([]);
+
+    const [message, setMessage] = useState("");
+    const [selectedModule, setSelectedModule] = useState<string>(
+        urlModuleCode || ""
+    );
+    const [modules, setModules] = useState<any[]>([]);
+    const [isLoading, setIsLoading] = useState(false);
+    const [isAITyping, setIsAITyping] = useState(false);
+    const [loadingMessage, setLoadingMessage] = useState(funLoadingMessages[0]);
+    const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
+    const [chatToDelete, setChatToDelete] = useState<string | null>(null);
+    const [isMobileSidebarOpen, setIsMobileSidebarOpen] = useState(false);
+
+    // Load chats and modules on mount
+    useEffect(() => {
+        loadChats();
+        loadModules();
+    }, []);
+
+    const loadModules = async () => {
+        try {
+            const data = await getChats("/api/student/modules");
+            setModules(data || []);
+
+            // Auto-select module if coming from ModuleContent page
+            if (urlModuleCode && data && data.length > 0) {
+                const matchedModule = data.find((m: any) =>
+                    m.code === urlModuleCode || m.moduleCode === urlModuleCode
+                );
+                if (matchedModule) {
+                    setSelectedModule(matchedModule.code || matchedModule.moduleCode || "");
+                }
+            }
+        } catch (err) {
+            // Modules are optional, so don't show error
+            setModules([]);
+        }
+    };
+
+    // Load specific chat if provided
+    useEffect(() => {
+        setIsLoading(true);
+        if (urlChatId) {
+            // Load the chat and restore its context from chatSessions
+            // loadChat handles both module and content restoration with proper metadata
+            loadChat(urlChatId);
+        } else if (urlContentIds || urlModuleCode) {
+            // When creating new chat from URL params, use selected content from context
+            // The selectedContent should already have file names from ModuleContent page
+            // Only set module if we have a module code
+            if (urlModuleCode && !selectedModule) {
+                setSelectedModule(urlModuleCode);
+            }
+
+            // If we don't have selectedContent but have URL contentIds, create placeholder items
+            // These will have IDs only, but file names will be available if coming from ModuleContent
+            if (urlContentIds && selectedContent.length === 0) {
+                const contentIdArray = urlContentIds.split(',').map(id => id.trim());
+                const contentItems = contentIdArray.map(id => ({
+                    id,
+                    name: id,        // Will be ID if not already loaded with names
+                    title: id,
+                    type: 'file',
+                }));
+                setSelectedContent(contentItems);
+            }
+
+            // Do NOT automatically create a chat here
+            // Wait until user sends their first message to create the chat
+            // This prevents empty chats from being created
+        }
+        setTimeout(() => setIsLoading(false), 300);
+    }, [urlChatId, urlContentIds, urlModuleCode]);
+
+    const loadChats = async () => {
+        try {
+            const data = await getChats("/api/chat");
+            setChatSessions(data || []);
+        } catch (err) {
+            toast.error("Failed to load chat history");
+        }
+    };
+
+    const createNewChat = async (moduleCode?: string, contentIds?: string) => {
+         try {
+             console.log('createNewChat called with:', { moduleCode, contentIds });
+             const payload: any = {
+                 title: "New Chat",
+             };
+
+             if (moduleCode) {
+                 payload.moduleCode = moduleCode;
+             }
+             if (contentIds) {
+                 payload.contentIds = contentIds.split(",");
+             }
+
+             console.log('Chat payload:', payload);
+             const newChat = await postChat("/api/chat", payload);
+             console.log('Chat created:', newChat);
+             await loadChats();
+             // Backend returns sessionId as the primary key
+             return (newChat as any)?.sessionId || (newChat as any)?.chatId || (newChat as any)?.id;
+         } catch (err) {
+             console.error('createNewChat error:', err);
+             toast.error("Failed to create chat");
+             return null;
+         }
+     };
+
+
+
+    const loadChat = async (chatId: string) => {
+        try {
+            setIsLoading(true);
+            console.log('Loading chat:', chatId);
+
+            // Set the current chat ID
+            setCurrentChatId(chatId);
+
+            // Fetch the specific chat session to get its metadata
+            // This is more reliable than searching chatSessions which might not be loaded yet
+            let session: any = null;
+            try {
+                const chatData = await getChats(`/api/chat/${chatId}`);
+                session = chatData;
+            } catch (err) {
+                console.warn('Failed to fetch chat metadata, trying cached sessions:', err);
+                // Fallback to searching in chatSessions if API call fails
+                session = chatSessions.find(s => (s.id || s.chatId || s.sessionId) === chatId);
+            }
+
+            // Restore module context from session
+            if (session?.moduleCode) {
+                setSelectedModule(session.moduleCode);
+            } else if (session?.moduleId) {
+                setSelectedModule(session.moduleId);
+            } else {
+                setSelectedModule("");
+            }
+
+            // Restore content context from session
+            if (session?.contentIds) {
+                const contentIdArray = Array.isArray(session.contentIds)
+                    ? session.contentIds
+                    : typeof session.contentIds === 'string'
+                        ? session.contentIds.split(',')
+                        : [];
+                
+                // Fetch file metadata for each content ID
+                // We'll try to get all module content and match by fileId
+                let contentItems: any[] = [];
+                
+                if (contentIdArray.length > 0) {
+                    try {
+                        // Fetch all student modules
+                        const allModules = await getChats('/api/student/modules');
+                        
+                        // Build a map of fileId -> fileName by fetching content from all modules
+                        const fileIdToNameMap: { [key: string]: string } = {};
+                        
+                        for (const module of allModules || []) {
+                            try {
+                                const moduleCode = module.code || module.moduleCode;
+                                const moduleContent = await getChats(`/api/student/modules/${moduleCode}/content`);
+                                
+                                if (moduleContent?.files && Array.isArray(moduleContent.files)) {
+                                    moduleContent.files.forEach((file: any) => {
+                                        fileIdToNameMap[file.fileId] = file.fileName || file.fileId;
+                                    });
+                                }
+                            } catch (err) {
+                                console.warn(`Failed to fetch content for module ${module.code}:`, err);
+                            }
+                        }
+                        
+                        // Map contentIds to their names
+                        contentItems = contentIdArray.map((id: string) => {
+                            const fileName = fileIdToNameMap[id.trim()];
+                            return {
+                                id: id.trim(),
+                                title: fileName || id.trim(),
+                                name: fileName || id.trim(),
+                                type: 'file',
+                            };
+                        });
+                    } catch (err) {
+                        console.warn('Failed to fetch content metadata:', err);
+                        // Fallback to using IDs as titles
+                        contentItems = contentIdArray.map((id: string) => ({
+                            id: id.trim(),
+                            title: id.trim(),
+                            name: id.trim(),
+                            type: 'file',
+                        }));
+                    }
+                }
+                setSelectedContent(contentItems);
+            } else {
+                setSelectedContent([]);
+            }
+
+            // Load messages from backend
+            const messages = await getMessages(`/api/chat/${chatId}/messages?limit=100&page=1`);
+            console.log('Messages loaded:', messages);
+
+            // Convert API response to display format
+            const displayMessages: ChatMessage[] = (messages || []).map((msg: any) => ({
+                id: msg.messageId,
+                messageId: msg.messageId,
+                content: msg.content,
+                sender: msg.role === 'user' ? 'user' : 'ai',
+                timestamp: msg.createdAt ? new Date(msg.createdAt).toISOString() : new Date().toISOString(),
+            }));
+
+            console.log('Display messages:', displayMessages);
+            setCurrentMessages(displayMessages);
+            setIsLoading(false);
+        } catch (err) {
+            console.error('Error loading chat:', err);
+            toast.error("Failed to load messages");
+            setIsLoading(false);
+        }
+    };
+
+    const addMessage = async (messageContent: string) => {
+        try {
+            // If no chat exists, create one first
+            let chatId = currentChatId;
+            if (!chatId) {
+                chatId = await createNewChat(selectedModule || undefined, selectedContent.map(c => c.id).join(',') || undefined);
+                if (!chatId) {
+                    toast.error("Failed to create chat session");
+                    return;
+                }
+                setCurrentChatId(chatId);
+
+                // Don't clear selected content - keep it displayed throughout the conversation
+                // Users need to see what context their questions are based on
+            }
+
+            // Display user message immediately
+            const userMsg: ChatMessage = {
+                id: `msg-${Date.now()}`,
+                messageId: `msg-${Date.now()}`,
+                content: messageContent,
+                sender: 'user',
+                timestamp: new Date().toISOString(),
+            };
+
+            setCurrentMessages((prev) => [...prev, userMsg]);
+            setIsAITyping(true);
+
+            // Send message to backend
+            const response = await postMessage(`/api/chat/${chatId}/messages`, {
+                message: messageContent,
+            });
+
+            // Backend returns both user and AI messages
+            console.log('Response from backend:', response);
+            if (response && response.userMessage && response.assistantMessage) {
+                console.log('Adding both messages to chat:', response.userMessage, response.assistantMessage);
+                // Replace the temp user message with the real one from backend
+                setCurrentMessages((prev) => {
+                    const withoutTemp = prev.filter((msg) => msg.content !== messageContent || msg.sender !== 'user');
+                    const newMessages = [
+                        ...withoutTemp,
+                        {
+                            id: response.userMessage.messageId,
+                            messageId: response.userMessage.messageId,
+                            content: response.userMessage.content,
+                            sender: 'user' as const,
+                            timestamp: response.userMessage.createdAt,
+                        },
+                        {
+                            id: response.assistantMessage.messageId,
+                            messageId: response.assistantMessage.messageId,
+                            content: response.assistantMessage.content,
+                            sender: 'ai' as const,
+                            timestamp: response.assistantMessage.createdAt,
+                        },
+                    ];
+                    console.log('Updated messages:', newMessages);
+                    return newMessages;
+                });
+
+                // Update chat list to show latest message
+                setChatSessions((prev) =>
+                    prev.map((chat) => {
+                        const chatId = chat.id || chat.chatId || chat.sessionId;
+                        if (chatId === currentChatId) {
+                            return {
+                                ...chat,
+                                lastMessage: response.assistantMessage.content,
+                                updatedAt: Date.now(),
+                            };
+                        }
+                        return chat;
+                    })
+                );
+            } else {
+                console.log('Response missing required fields:', { hasUserMessage: !!response?.userMessage, hasAssistantMessage: !!response?.assistantMessage });
+            }
+
+            setIsAITyping(false);
+        } catch (err) {
+            setIsAITyping(false);
+            toast.error("Failed to send message");
+        }
+    };
+
+    useEffect(() => {
+        if (isAITyping) {
+            const interval = setInterval(() => {
+                setLoadingMessage(
+                    funLoadingMessages[
+                    Math.floor(Math.random() * funLoadingMessages.length)
+                    ]
+                );
+            }, 2000);
+            return () => clearInterval(interval);
+        }
+    }, [isAITyping]);
+
+    const hasContext =
+        selectedModule || selectedContent.length > 0 || currentChatId;
+
+    const handleSendMessage = async () => {
+        if (!message.trim() || !hasContext) return;
+
+        const userMessage = message;
+        setMessage("");
+        setIsAITyping(true);
+
+        try {
+            await addMessage(userMessage);
+        } catch (err) {
+            setIsAITyping(false);
+        }
+    };
+
+    const handleDeleteChat = (chatId: string) => {
+        setChatToDelete(chatId);
+        setDeleteDialogOpen(true);
+    };
+
+    const confirmDeleteChat = async () => {
+        if (chatToDelete && chatToDelete.trim()) {
+            try {
+                console.log('Deleting chat:', chatToDelete);
+                await deleteChat(`/api/chat/${chatToDelete}`);
+                await loadChats();
+                setCurrentChatId(null);
+                setCurrentMessages([]);
+                toast.success("Chat deleted");
+            } catch (err) {
+                console.error('Delete error:', err);
+                toast.error("Failed to delete chat");
+            }
+        } else {
+            toast.error("Invalid chat ID");
+        }
+        setDeleteDialogOpen(false);
+        setChatToDelete(null);
+    };
+
+    const handleNewChat = async () => {
+        // Create new chat with current selected content/module if available
+        const moduleCode = selectedModule || undefined;
+        const contentIds = selectedContent.length > 0 
+            ? selectedContent.map(c => c.id).join(',')
+            : undefined;
+
+        const newId = await createNewChat(moduleCode, contentIds);
+        if (newId) {
+            navigate(`/chat?chatId=${newId}`);
+            setIsMobileSidebarOpen(false);
+        }
+    };
+
+    const handleSelectChat = async (session: ChatSession) => {
+        // Accept either id, chatId, or sessionId from backend
+        const sessionId = session.id || session.chatId || session.sessionId;
+        if (sessionId) {
+            setCurrentChatId(sessionId);
+            await loadChat(sessionId);
+
+            // Restore this chat's own context (module + content)
+            if (session.moduleId) {
+                setSelectedModule(session.moduleId);
+            } else {
+                setSelectedModule("");
+            }
+
+            if (session.contentIds) {
+                // Reconstruct ContentItem array from contentIds string
+                const contentIdArray = Array.isArray(session.contentIds)
+                    ? session.contentIds
+                    : typeof session.contentIds === 'string'
+                        ? session.contentIds.split(',')
+                        : [];
+
+                const contentItems = contentIdArray.map(id => ({
+                    id: id.trim(),
+                    name: id.trim(),
+                }));
+                setSelectedContent(contentItems);
+            } else {
+                setSelectedContent([]);
+            }
+
+            navigate(`/chat?chatId=${sessionId}`);
+            setIsMobileSidebarOpen(false);
+        }
+    };
+
+    const ChatSidebarContent = () => (
+        <>
+            <div className="p-4">
+                <Button className="w-full" onClick={handleNewChat}>
+                    <Plus className="w-4 h-4 mr-2" />
+                    New Chat
+                </Button>
+            </div>
+            <div className="flex-1 p-4 overflow-auto scrollbar-thin">
+                <h3 className="text-xs font-semibold text-muted-foreground uppercase tracking-wider mb-3">
+                    Recent Chats
+                </h3>
+                <div className="space-y-2">
+                    {chatSessions.map((session) => {
+                        const sessionId = session.id || session.chatId || session.sessionId;
+                        return (
+                            <div
+                                key={sessionId}
+                                onClick={() => handleSelectChat(session)}
+                                className={cn(
+                                    "p-3 rounded-xl cursor-pointer transition-all group card-interactive",
+                                    currentChatId === sessionId &&
+                                    "border-primary bg-primary/5"
+                                )}
+                            >
+                                <div className="flex items-start justify-between mb-1">
+                                    <h4 className="font-medium text-sm text-foreground truncate flex-1">
+                                        {session.title}
+                                    </h4>
+                                    <DropdownMenu>
+                                        <DropdownMenuTrigger
+                                            asChild
+                                            onClick={(e) => e.stopPropagation()}
+                                        >
+                                            <button className="opacity-0 group-hover:opacity-100 transition-opacity p-1 hover:bg-secondary rounded">
+                                                <MoreVertical className="w-4 h-4 text-muted-foreground" />
+                                            </button>
+                                        </DropdownMenuTrigger>
+                                        <DropdownMenuContent
+                                            align="end"
+                                            className="bg-popover border-border"
+                                        >
+                                            <DropdownMenuItem
+                                                 className="text-destructive"
+                                                 disabled={!sessionId}
+                                                 onClick={(e) => {
+                                                     e.stopPropagation();
+                                                     if (sessionId) {
+                                                         handleDeleteChat(sessionId);
+                                                     }
+                                                 }}
+                                             >
+                                                 <Trash2 className="w-4 h-4 mr-2" />
+                                                 Delete
+                                             </DropdownMenuItem>
+                                        </DropdownMenuContent>
+                                    </DropdownMenu>
+                                </div>
+                                <p className="text-xs text-muted-foreground truncate mb-1">
+                                    {session.lastMessage || `${session.messageCount || 0} messages`}
+                                </p>
+                                <div className="flex items-center justify-between">
+                                    <span className="text-xs text-primary">
+                                        {session.moduleCode}
+                                    </span>
+                                    <span className="text-xs text-muted-foreground">
+                                        {session.timestamp ||
+                                            (session.createdAt
+                                                ? typeof session.createdAt === 'string'
+                                                    ? new Date(session.createdAt).toLocaleDateString()
+                                                    : new Date(session.createdAt).toLocaleDateString()
+                                                : 'N/A')}
+                                    </span>
+                                </div>
+                            </div>
+                        );
+                    })}
+                </div>
+            </div>
+        </>
+    );
+
+    if (isLoading) {
+        return (
+            <MainLayout>
+                <div className="flex-1 flex items-center justify-center">
+                    <LoadingSpinner message="Loading chat..." />
+                </div>
+            </MainLayout>
+        );
+    }
+
+    return (
+        <MainLayout
+            rightSidebar={
+                <aside className="hidden lg:flex w-72 h-full bg-sidebar border-l border-sidebar-border flex-col">
+                    <ChatSidebarContent />
+                </aside>
+            }
+        >
+            <div className="flex-1 flex flex-col h-full overflow-hidden">
+                <header className="p-4 md:p-6">
+                    <div className="flex items-center justify-between">
+                        <div>
+                            <h1 className="text-xl md:text-2xl font-display font-bold text-foreground">
+                                Get Smarter with <span className="text-gradient">AI Tutor</span>
+                            </h1>
+                            <p className="text-muted-foreground text-xs md:text-sm mt-1">
+                                Ask questions and enhance your learning
+                            </p>
+                        </div>
+                        <Sheet
+                            open={isMobileSidebarOpen}
+                            onOpenChange={setIsMobileSidebarOpen}
+                        >
+                            <SheetTrigger asChild>
+                                <Button variant="outline" size="icon" className="lg:hidden">
+                                    <MessageSquare className="w-5 h-5" />
+                                </Button>
+                            </SheetTrigger>
+                            <SheetContent side="right" className="w-80 p-0 bg-sidebar">
+                                <SheetHeader className="p-4 border-b border-sidebar-border">
+                                    <SheetTitle>Chat History</SheetTitle>
+                                </SheetHeader>
+                                <div className="flex flex-col h-[calc(100%-60px)]">
+                                    <ChatSidebarContent />
+                                </div>
+                            </SheetContent>
+                        </Sheet>
+                    </div>
+                </header>
+
+                <div className="px-4 md:px-6 pt-4">
+                    <SelectedContentBar />
+                </div>
+
+                <div className="flex-1 overflow-y-auto p-4 md:p-6 scrollbar-thin">
+                    <div className="max-w-3xl mx-auto space-y-4">
+                        {currentMessages.map((msg) => (
+                            <div
+                                key={msg.id}
+                                className={cn(
+                                    "flex gap-2 md:gap-3 animate-slide-up",
+                                    msg.sender === "user" ? "flex-row-reverse" : ""
+                                )}
+                            >
+                                <div
+                                    className={cn(
+                                        "w-8 h-8 md:w-9 md:h-9 rounded-full flex items-center justify-center flex-shrink-0",
+                                        msg.sender === "ai"
+                                            ? "bg-primary/20 text-primary"
+                                            : "bg-secondary text-muted-foreground"
+                                    )}
+                                >
+                                    {msg.sender === "ai" ? (
+                                        <Sparkles className="w-4 h-4 md:w-5 md:h-5" />
+                                    ) : (
+                                        <span className="text-xs md:text-sm font-medium">U</span>
+                                    )}
+                                </div>
+                                <div
+                                    className={cn(
+                                        "max-w-[85%] md:max-w-[80%] p-3 md:p-4 rounded-2xl",
+                                        msg.sender === "ai"
+                                            ? "bg-card border border-border rounded-tl-sm"
+                                            : "bg-primary text-primary-foreground rounded-tr-sm"
+                                    )}
+                                >
+                                    {msg.sender === "ai" ? (
+                                        <AIMessageRenderer content={msg.content} />
+                                    ) : (
+                                        <p className="text-xs md:text-sm leading-relaxed">
+                                            {msg.content}
+                                        </p>
+                                    )}
+                                </div>
+                            </div>
+                        ))}
+                        {isAITyping && (
+                            <div className="flex gap-2 md:gap-3">
+                                <div className="w-8 h-8 md:w-9 md:h-9 rounded-full flex items-center justify-center flex-shrink-0 bg-primary/20 text-primary">
+                                    <Sparkles className="w-4 h-4 md:w-5 md:h-5" />
+                                </div>
+                                <div className="max-w-[85%] md:max-w-[80%] p-3 md:p-4 rounded-2xl bg-card border border-border rounded-tl-sm">
+                                    <p className="text-xs md:text-sm leading-relaxed text-muted-foreground animate-pulse">
+                                        {loadingMessage}
+                                    </p>
+                                </div>
+                            </div>
+                        )}
+                    </div>
+                </div>
+
+                <div className="p-4 md:p-6">
+                    {!hasContext && (
+                        <div className="max-w-3xl mx-auto mb-4 p-3 rounded-lg bg-warning/10 border border-warning/20 flex items-center gap-2">
+                            <AlertCircle className="w-4 h-4 md:w-5 md:h-5 text-warning flex-shrink-0" />
+                            <p className="text-xs md:text-sm text-warning">
+                                Please select a module or content items to provide context.
+                            </p>
+                        </div>
+                    )}
+                    <div className="max-w-3xl mx-auto flex flex-col sm:flex-row gap-3">
+                        <Select value={selectedModule} onValueChange={setSelectedModule}>
+                            <SelectTrigger className="w-full sm:w-56">
+                                <SelectValue placeholder="Select module to provide context" />
+                            </SelectTrigger>
+                            <SelectContent className="bg-popover border-border">
+                                {modules.length > 0 ? (
+                                    modules.map((module) => (
+                                        <SelectItem
+                                            key={module.id || module.moduleId}
+                                            value={module.id || module.moduleId || ""}
+                                        >
+                                            <div className="flex flex-col">
+                                                <span className="font-medium">
+                                                    {module.code || module.moduleCode}
+                                                </span>
+                                                <span className="text-xs text-muted-foreground">
+                                                    {module.name || module.moduleName}
+                                                </span>
+                                            </div>
+                                        </SelectItem>
+                                    ))
+                                ) : (
+                                    <div className="p-2 text-sm text-muted-foreground">
+                                        No modules available
+                                    </div>
+                                )}
+                            </SelectContent>
+                        </Select>
+                        <div className="flex-1 relative">
+                            <Input
+                                type="text"
+                                placeholder={
+                                    hasContext
+                                        ? "Enter your question..."
+                                        : "Select context first..."
+                                }
+                                value={message}
+                                onChange={(e) => setMessage(e.target.value)}
+                                onKeyDown={(e) => e.key === "Enter" && handleSendMessage()}
+                                className="pr-12"
+                                disabled={!hasContext}
+                            />
+                            <Button
+                                size="icon"
+                                className="absolute right-1 top-1/2 -translate-y-1/2 h-8 w-8"
+                                onClick={handleSendMessage}
+                                disabled={!hasContext || !message.trim()}
+                            >
+                                <Send className="w-4 h-4" />
+                            </Button>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <AlertDialog open={deleteDialogOpen} onOpenChange={setDeleteDialogOpen}>
+                <AlertDialogContent className="bg-card border-border max-w-[90vw] sm:max-w-lg">
+                    <AlertDialogHeader>
+                        <AlertDialogTitle>Delete Chat</AlertDialogTitle>
+                        <AlertDialogDescription>
+                            Are you sure you want to delete this chat? This action cannot be
+                            undone.
+                        </AlertDialogDescription>
+                    </AlertDialogHeader>
+                    <AlertDialogFooter className="flex-col sm:flex-row gap-2">
+                        <AlertDialogCancel className="w-full sm:w-auto">
+                            Cancel
+                        </AlertDialogCancel>
+                        <AlertDialogAction
+                            onClick={confirmDeleteChat}
+                            className="w-full sm:w-auto bg-destructive text-destructive-foreground hover:bg-destructive/90"
+                        >
+                            Delete
+                        </AlertDialogAction>
+                    </AlertDialogFooter>
+                </AlertDialogContent>
+            </AlertDialog>
+        </MainLayout>
+    );
+};
+
+export default Chat;

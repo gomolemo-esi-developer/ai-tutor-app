@@ -1,0 +1,175 @@
+/* Theme Configuration - Central source for all design tokens */
+
+/* Font imports */
+@import url('https://fonts.googleapis.com/css2?family=Poppins:wght@300;400;500;600;700&display=swap');
+
+/* Design System Variables */
+:root {
+  /* Color Palette - Updated with marked colors from scripts */
+  --background: 210 40% 98%; /* #f7fafc */
+  /* New Black: 217 19% 27% ---> #374151 */
+  /*  New Black: #111827 */
+  --foreground: 0 0% 13%; /* #222222 */
+  --card: 0 0% 100%; /* #ffffff */
+  --card-foreground: 0 0% 13%; /* #222222 */
+  --popover: 0 0% 100%;
+  --popover-foreground: 0 0% 13%;
+  --primary: 210 100% 50%; /* #007aff */
+  --primary-dark: 218 100% 40%; /* #0046cf */
+  --primary-foreground: 0 0% 100%; /* #ffffff */
+  --secondary: 210 40% 96%; /* #edf2f7 */
+  --secondary-foreground: 0 0% 13%;
+  --muted: 210 40% 98%; /* #f7fafc */
+  --muted-foreground: 210 16% 75%; /* #a0aec0 */
+  --muted-dark: 208 14% 52% ; /* #718096 */
+  --accent: 210 50% 96%; /* #e6f0fa */
+  --accent: 210 50% 96%;
+  --accent-light: 214 95% 93%;  /* #dbeafe */
+  --accent-foreground: 0 0% 13%;
+  --destructive: 0 84% 60%; /* #e53e3e */
+  --destructive-foreground: 0 0% 100%;
+  --border: 210 40% 94%; /* #e2e8f0 */
+  --input: 210 40% 94%;
+  --ring: 210 100% 50%; /* #007aff */
+  --radius: 0.5rem;
+  --border-faint: hsl(var(--border) / 0.1); /* #a0aec018 */
+  --accent-faint: hsl(var(--accent) / 0.5); /* #e6f0fa79 */
+  --sidebar-background: 210 100% 50%; /* #007aff */
+  --sidebar-foreground: 0 0% 100%;
+  --sidebar-primary: 210 100% 50%;
+  --sidebar-primary-foreground: 0 0% 100%;
+  --sidebar-accent: 210 40% 96%;
+  --sidebar-accent-foreground: 0 0% 13%;
+  --sidebar-border: 210 40% 94%;
+  --sidebar-ring: 210 100% 50%;
+  
+  /* Spacing Scale - Added 20px and 12px from marked styles */
+  --spacing-xs: 0.25rem;    /* 4px */
+  --spacing-sm: 0.5rem;     /* 8px */
+  --spacing-md: 0.75rem;    /* 12px */
+  --spacing-20: 1.25rem;    /* 20px */
+  --spacing-lg: 1.5rem;     /* 24px */
+  --spacing-xl: 2rem;       /* 32px */
+  --spacing-2xl: 3rem;      /* 48px */
+  --spacing-3xl: 4rem;      /* 64px */
+  
+  /* Typography Scale */
+  --font-poppins: 'Poppins', sans-serif;
+  --font-size-xs: 0.75rem;    /* 12px */
+  --font-size-sm: 0.875rem;   /* 14px */
+  --font-size-base: 1rem;     /* 16px */
+  --font-size-lg: 1.125rem;   /* 18px */
+  --font-size-xl: 1.25rem;    /* 20px */
+  --font-size-2xl: 1.5rem;    /* 24px */
+  --font-size-3xl: 1.75rem;   /* 28px */
+  --font-size-4xl: 2.25rem;   /* 36px */
+  
+  /* Line Heights */
+  --line-height-tight: 1.2;
+  --line-height-normal: 1.5;
+  --line-height-loose: 1.6;
+  
+  /* Font Weights */
+  --font-weight-light: 300;
+  --font-weight-normal: 400;
+  --font-weight-medium: 500;
+  --font-weight-semibold: 600;
+  --font-weight-bold: 700;
+  
+  /* Shadows - Updated with marked shadow */
+  --shadow-sm: 0 2px 4px rgb(0 0 0 / 0.05);
+  --shadow-md: 0 4px 6px -1px rgb(0 0 0 / 0.1), 0 2px 4px -2px rgb(0 0 0 / 0.1);
+  --shadow-lg: 0 10px 15px -3px rgb(0 0 0 / 0.1), 0 4px 6px -4px rgb(0 0 0 / 0.1);
+  --shadow-xl: 0 20px 25px -5px rgb(0 0 0 / 0.1), 0 8px 10px -6px rgb(0 0 0 / 0.1);
+  
+  /* Transitions - Matched marked 0.2s and 0.3s */
+  --transition-fast: 150ms; 
+  --transition-normal: 200ms;
+  --transition-slow: 300ms;
+  
+  /* Border Radius - Added 15px from marked styles */
+  --radius-sm: 0.25rem; /* 4px */
+  --radius-md: 0.5rem; /* 8px */
+  --radius-lg: 0.75rem;
+  --radius-15: 0.9375rem; /* 15px */
+  --radius-xl: 1rem;
+  --radius-full: 9999px;
+  
+  /* Z-Index Scale */
+  --z-dropdown: 1000;
+  --z-sticky: 1020;
+  --z-fixed: 1030;
+  --z-modal-backdrop: 1040;
+  --z-modal: 1050;
+  --z-popover: 1060;
+  --z-tooltip: 1070;
+  --z-toast: 1080;
+  
+  /* Layout Breakpoints - Added 992px from scripts */
+  --breakpoint-sm: 640px;
+  --breakpoint-md: 768px;
+  --breakpoint-lg: 992px;
+  --breakpoint-xl: 1280px;
+  --breakpoint-2xl: 1536px;
+  
+  /* Component Specific Paddings - Updated with 20px */
+  --padding-card: var(--spacing-20);
+  --padding-card-compact: var(--spacing-md);
+  --padding-sidebar: var(--spacing-20);
+  --padding-sidebar-item: var(--spacing-md) var(--spacing-lg);
+  --padding-button: var(--spacing-sm) var(--spacing-md);
+  --padding-button-sm: var(--spacing-xs) var(--spacing-sm);
+  --padding-button-lg: var(--spacing-md) var(--spacing-xl);
+  --padding-input: var(--spacing-sm) var(--spacing-md);
+  --padding-section: var(--spacing-20);
+  --padding-container: var(--spacing-20);
+}
+
+/* Dark theme - Adjusted to complement marked colors */
+.dark {
+  --background: 0 0% 13%;
+  --foreground: 210 40% 98%;
+  --card: 0 0% 13%;
+  --card-foreground: 210 40% 98%;
+  --popover: 0 0% 13%;
+  --popover-foreground: 210 40% 98%;
+  --primary: 210 100% 50%;
+  --primary-foreground: 0 0% 13%;
+  --secondary: 210 40% 10%;
+  --secondary-foreground: 210 40% 98%;
+  --muted: 210 40% 10%;
+  --muted-foreground: 210 16% 75%;
+  --accent: 210 50% 10%;
+  --accent-light: 214 95% 83%;
+  --accent-foreground: 210 40% 98%;
+  --destructive: 0 62.8% 30.6%;
+  --destructive-foreground: 210 40% 98%;
+  --border: 210 40% 10%;
+  --input: 210 40% 10%;
+  --ring: 210 100% 50%;
+  --border-faint: hsl(var(--border) / 0.1);
+  --accent-faint: hsl(var(--accent) / 0.5);
+  --sidebar-background: 210 100% 30%;
+  --sidebar-foreground: 0 0% 100%;
+  --sidebar-primary: 210 100% 50%;
+  --sidebar-primary-foreground: 0 0% 100%;
+  --sidebar-accent: 210 40% 10%;
+  --sidebar-accent-foreground: 210 40% 98%;
+  --sidebar-border: 210 40% 10%;
+  --sidebar-ring: 210 100% 50%;
+}
+
+/* Responsive Design Tokens */
+@media (min-width: 640px) {
+  :root {
+    --padding-section: var(--spacing-2xl);
+    --padding-container: var(--spacing-xl);
+  }
+}
+
+@media (min-width: 992px) {
+  :root {
+    --padding-section: var(--spacing-3xl);
+    --padding-container: var(--spacing-2xl);
+  }
+}

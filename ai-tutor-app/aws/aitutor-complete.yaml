@@ -1,0 +1,2028 @@
+AWSTemplateFormatVersion: '2010-09-09'
+Description: |
+  TutorVerse - Complete Enterprise Educational Platform Infrastructure
+  
+  Creates all resources needed for a production TutorVerse deployment:
+  - Cognito User Pool & Client (Authentication)
+  - 14 DynamoDB Tables (Data Persistence)
+  - 2 S3 Buckets (File Storage)
+  - API Gateway (REST API)
+  - 18 Lambda Functions (Business Logic)
+  - IAM Roles & Permissions
+  
+  Deployment: Single CloudFormation stack creates entire infrastructure
+  Environment: Supports development, staging, production
+
+Parameters:
+  EnvironmentName:
+    Type: String
+    Default: development
+    AllowedValues:
+      - development
+      - staging
+      - production
+    Description: Deployment environment
+
+  RegionName:
+    Type: String
+    Default: us-east-2
+    Description: AWS region for deployment
+
+  AccountId:
+    Type: String
+    NoEcho: true
+    Description: AWS Account ID
+
+  AdminEmail:
+    Type: String
+    Description: Admin email for system notifications
+
+  FrontendUrl:
+    Type: String
+    Default: http://localhost:5173
+    Description: Frontend URL for CORS and Cognito callbacks
+
+  LambdaCodeBucket:
+    Type: String
+    Description: S3 bucket containing Lambda function code
+
+  LambdaCodeZipKey:
+    Type: String
+    Default: lambda-code.zip
+    Description: S3 key for Lambda function code ZIP
+
+Metadata:
+  AWS::CloudFormation::Interface:
+    ParameterGroups:
+      - Label:
+          default: Environment Configuration
+        Parameters:
+          - EnvironmentName
+          - RegionName
+          - AccountId
+      - Label:
+          default: Contact & Frontend
+        Parameters:
+          - AdminEmail
+          - FrontendUrl
+      - Label:
+          default: Lambda Deployment
+        Parameters:
+          - LambdaCodeBucket
+          - LambdaCodeZipKey
+
+Conditions:
+  IsProduction: !Equals [!Ref EnvironmentName, production]
+  IsStaging: !Equals [!Ref EnvironmentName, staging]
+  IsDevelopment: !Equals [!Ref EnvironmentName, development]
+
+Resources:
+  # ==================== IAM ROLES ====================
+  LambdaExecutionRole:
+    Type: AWS::IAM::Role
+    Properties:
+      RoleName: !Sub 'tutorverse-lambda-${EnvironmentName}'
+      AssumeRolePolicyDocument:
+        Version: '2012-10-17'
+        Statement:
+          - Effect: Allow
+            Principal:
+              Service: lambda.amazonaws.com
+            Action: sts:AssumeRole
+      ManagedPolicyArns:
+        - arn:aws:iam::aws:policy/service-role/AWSLambdaBasicExecutionRole
+      Policies:
+        - PolicyName: DynamoDBAccess
+          PolicyDocument:
+            Version: '2012-10-17'
+            Statement:
+              - Effect: Allow
+                Action:
+                  - dynamodb:GetItem
+                  - dynamodb:PutItem
+                  - dynamodb:UpdateItem
+                  - dynamodb:DeleteItem
+                  - dynamodb:Query
+                  - dynamodb:Scan
+                  - dynamodb:BatchGetItem
+                  - dynamodb:BatchWriteItem
+                Resource: !Sub 'arn:aws:dynamodb:${AWS::Region}:${AWS::AccountId}:table/aitutor_*'
+        - PolicyName: S3Access
+          PolicyDocument:
+            Version: '2012-10-17'
+            Statement:
+              - Effect: Allow
+                Action:
+                  - s3:GetObject
+                  - s3:PutObject
+                  - s3:DeleteObject
+                  - s3:ListBucket
+                Resource:
+                  - !Sub 'arn:aws:s3:::aitutor-files-${EnvironmentName}-${AWS::AccountId}/*'
+                  - !Sub 'arn:aws:s3:::aitutor-files-${EnvironmentName}-${AWS::AccountId}'
+                  - !Sub 'arn:aws:s3:::aitutor-logs-${EnvironmentName}-${AWS::AccountId}/*'
+                  - !Sub 'arn:aws:s3:::aitutor-logs-${EnvironmentName}-${AWS::AccountId}'
+        - PolicyName: CognitoAccess
+          PolicyDocument:
+            Version: '2012-10-17'
+            Statement:
+              - Effect: Allow
+                Action:
+                  - cognito-idp:AdminGetUser
+                  - cognito-idp:AdminUpdateUserAttributes
+                  - cognito-idp:AdminSetUserPassword
+                Resource: !GetAtt TutorVerseUserPool.Arn
+
+  # ==================== COGNITO USER POOL ====================
+  TutorVerseUserPool:
+    Type: AWS::Cognito::UserPool
+    Properties:
+      UserPoolName: !Sub 'tutorverse-${EnvironmentName}'
+      Policies:
+        PasswordPolicy:
+          MinimumLength: 8
+          RequireUppercase: true
+          RequireLowercase: true
+          RequireNumbers: true
+          RequireSymbols: true
+      AutoVerifiedAttributes:
+        - email
+      UsernameAttributes:
+        - email
+      Schema:
+        - Name: email
+          AttributeDataType: String
+          Mutable: true
+          Required: true
+          DeveloperOnlyAttribute: false
+        - Name: given_name
+          AttributeDataType: String
+          Mutable: true
+        - Name: family_name
+          AttributeDataType: String
+          Mutable: true
+        - Name: custom:role
+          AttributeDataType: String
+          Mutable: true
+          DeveloperOnlyAttribute: false
+        - Name: custom:staff_num
+          AttributeDataType: String
+          Mutable: true
+          DeveloperOnlyAttribute: false
+        - Name: custom:student_num
+          AttributeDataType: String
+          Mutable: true
+          DeveloperOnlyAttribute: false
+        - Name: custom:department_id
+          AttributeDataType: String
+          Mutable: true
+          DeveloperOnlyAttribute: false
+        - Name: custom:campus_id
+          AttributeDataType: String
+          Mutable: true
+          DeveloperOnlyAttribute: false
+      AccountRecoverySetting:
+        RecoveryMechanisms:
+          - Name: verified_email
+            Priority: 1
+      MfaConfiguration: OPTIONAL
+      EnabledMfas:
+        - SOFTWARE_TOKEN_MFA
+      UserAttributeUpdateSettings:
+        AttributesRequireVerificationBeforeUpdate:
+          - email
+      Tags:
+        Environment: !Ref EnvironmentName
+
+  TutorVerseUserPoolClient:
+    Type: AWS::Cognito::UserPoolClient
+    Properties:
+      ClientName: !Sub 'tutorverse-client-${EnvironmentName}'
+      UserPoolId: !Ref TutorVerseUserPool
+      ExplicitAuthFlows:
+        - ALLOW_USER_PASSWORD_AUTH
+        - ALLOW_REFRESH_TOKEN_AUTH
+        - ALLOW_CUSTOM_AUTH
+      GenerateSecret: false
+      RefreshTokenValidity: 7
+      AccessTokenValidity: 1
+      IdTokenValidity: 1
+      TokenValidityUnits:
+        AccessToken: hours
+        IdToken: hours
+        RefreshToken: days
+      PreventUserExistenceErrors: ENABLED
+      AllowedOAuthFlows:
+        - code
+        - implicit
+      AllowedOAuthScopes:
+        - email
+        - openid
+        - profile
+      AllowedOAuthFlowsUserPoolClient: true
+      CallbackURLs:
+        - !Sub '${FrontendUrl}/callback'
+        - !Sub '${FrontendUrl}/auth/callback'
+      LogoutURLs:
+        - !Sub '${FrontendUrl}/logout'
+
+  # ==================== DYNAMODB TABLES (14 total) ====================
+  # Core Identity Tables
+  UsersTable:
+    Type: AWS::DynamoDB::Table
+    Properties:
+      TableName: aitutor_users
+      BillingMode: PAY_PER_REQUEST
+      AttributeDefinitions:
+        - AttributeName: userId
+          AttributeType: S
+        - AttributeName: email
+          AttributeType: S
+        - AttributeName: createdAt
+          AttributeType: N
+      KeySchema:
+        - AttributeName: userId
+          KeyType: HASH
+      GlobalSecondaryIndexes:
+        - IndexName: email-index
+          KeySchema:
+            - AttributeName: email
+              KeyType: HASH
+          Projection:
+            ProjectionType: ALL
+        - IndexName: createdAt-index
+          KeySchema:
+            - AttributeName: createdAt
+              KeyType: HASH
+          Projection:
+            ProjectionType: ALL
+      StreamSpecification:
+        StreamViewType: NEW_AND_OLD_IMAGES
+      PointInTimeRecoverySpecification:
+        PointInTimeRecoveryEnabled: true
+      Tags:
+        - Key: Environment
+          Value: !Ref EnvironmentName
+
+  LecturersTable:
+    Type: AWS::DynamoDB::Table
+    Properties:
+      TableName: aitutor_lecturers
+      BillingMode: PAY_PER_REQUEST
+      AttributeDefinitions:
+        - AttributeName: lecturerId
+          AttributeType: S
+        - AttributeName: userId
+          AttributeType: S
+        - AttributeName: staffNumber
+          AttributeType: S
+        - AttributeName: departmentId
+          AttributeType: S
+      KeySchema:
+        - AttributeName: lecturerId
+          KeyType: HASH
+      GlobalSecondaryIndexes:
+        - IndexName: userId-index
+          KeySchema:
+            - AttributeName: userId
+              KeyType: HASH
+          Projection:
+            ProjectionType: ALL
+        - IndexName: staffNumber-index
+          KeySchema:
+            - AttributeName: staffNumber
+              KeyType: HASH
+          Projection:
+            ProjectionType: ALL
+        - IndexName: departmentId-index
+          KeySchema:
+            - AttributeName: departmentId
+              KeyType: HASH
+          Projection:
+            ProjectionType: ALL
+      StreamSpecification:
+        StreamViewType: NEW_AND_OLD_IMAGES
+      PointInTimeRecoverySpecification:
+        PointInTimeRecoveryEnabled: true
+      Tags:
+        - Key: Environment
+          Value: !Ref EnvironmentName
+
+  StudentsTable:
+    Type: AWS::DynamoDB::Table
+    Properties:
+      TableName: aitutor_students
+      BillingMode: PAY_PER_REQUEST
+      AttributeDefinitions:
+        - AttributeName: studentId
+          AttributeType: S
+        - AttributeName: userId
+          AttributeType: S
+        - AttributeName: studentNumber
+          AttributeType: S
+        - AttributeName: departmentId
+          AttributeType: S
+      KeySchema:
+        - AttributeName: studentId
+          KeyType: HASH
+      GlobalSecondaryIndexes:
+        - IndexName: userId-index
+          KeySchema:
+            - AttributeName: userId
+              KeyType: HASH
+          Projection:
+            ProjectionType: ALL
+        - IndexName: studentNumber-index
+          KeySchema:
+            - AttributeName: studentNumber
+              KeyType: HASH
+          Projection:
+            ProjectionType: ALL
+        - IndexName: departmentId-index
+          KeySchema:
+            - AttributeName: departmentId
+              KeyType: HASH
+          Projection:
+            ProjectionType: ALL
+      StreamSpecification:
+        StreamViewType: NEW_AND_OLD_IMAGES
+      PointInTimeRecoverySpecification:
+        PointInTimeRecoveryEnabled: true
+      Tags:
+        - Key: Environment
+          Value: !Ref EnvironmentName
+
+  # Academic Tables
+  ModulesTable:
+    Type: AWS::DynamoDB::Table
+    Properties:
+      TableName: aitutor_modules
+      BillingMode: PAY_PER_REQUEST
+      AttributeDefinitions:
+        - AttributeName: moduleId
+          AttributeType: S
+        - AttributeName: courseId
+          AttributeType: S
+        - AttributeName: moduleCode
+          AttributeType: S
+      KeySchema:
+        - AttributeName: moduleId
+          KeyType: HASH
+      GlobalSecondaryIndexes:
+        - IndexName: courseId-index
+          KeySchema:
+            - AttributeName: courseId
+              KeyType: HASH
+          Projection:
+            ProjectionType: ALL
+        - IndexName: moduleCode-index
+          KeySchema:
+            - AttributeName: moduleCode
+              KeyType: HASH
+          Projection:
+            ProjectionType: ALL
+      StreamSpecification:
+        StreamViewType: NEW_AND_OLD_IMAGES
+      PointInTimeRecoverySpecification:
+        PointInTimeRecoveryEnabled: true
+      Tags:
+        - Key: Environment
+          Value: !Ref EnvironmentName
+
+  FilesTable:
+    Type: AWS::DynamoDB::Table
+    Properties:
+      TableName: aitutor_files
+      BillingMode: PAY_PER_REQUEST
+      AttributeDefinitions:
+        - AttributeName: fileId
+          AttributeType: S
+        - AttributeName: moduleId
+          AttributeType: S
+      KeySchema:
+        - AttributeName: fileId
+          KeyType: HASH
+      GlobalSecondaryIndexes:
+        - IndexName: moduleId-index
+          KeySchema:
+            - AttributeName: moduleId
+              KeyType: HASH
+          Projection:
+            ProjectionType: ALL
+      StreamSpecification:
+        StreamViewType: NEW_AND_OLD_IMAGES
+      PointInTimeRecoverySpecification:
+        PointInTimeRecoveryEnabled: true
+      Tags:
+        - Key: Environment
+          Value: !Ref EnvironmentName
+
+  DepartmentsTable:
+    Type: AWS::DynamoDB::Table
+    Properties:
+      TableName: aitutor_departments
+      BillingMode: PAY_PER_REQUEST
+      AttributeDefinitions:
+        - AttributeName: departmentId
+          AttributeType: S
+        - AttributeName: facultyId
+          AttributeType: S
+      KeySchema:
+        - AttributeName: departmentId
+          KeyType: HASH
+      GlobalSecondaryIndexes:
+        - IndexName: facultyId-index
+          KeySchema:
+            - AttributeName: facultyId
+              KeyType: HASH
+          Projection:
+            ProjectionType: ALL
+      StreamSpecification:
+        StreamViewType: NEW_AND_OLD_IMAGES
+      PointInTimeRecoverySpecification:
+        PointInTimeRecoveryEnabled: true
+      Tags:
+        - Key: Environment
+          Value: !Ref EnvironmentName
+
+  FacultiesTable:
+    Type: AWS::DynamoDB::Table
+    Properties:
+      TableName: aitutor_faculties
+      BillingMode: PAY_PER_REQUEST
+      AttributeDefinitions:
+        - AttributeName: facultyId
+          AttributeType: S
+      KeySchema:
+        - AttributeName: facultyId
+          KeyType: HASH
+      StreamSpecification:
+        StreamViewType: NEW_AND_OLD_IMAGES
+      PointInTimeRecoverySpecification:
+        PointInTimeRecoveryEnabled: true
+      Tags:
+        - Key: Environment
+          Value: !Ref EnvironmentName
+
+  CoursesTable:
+    Type: AWS::DynamoDB::Table
+    Properties:
+      TableName: aitutor_courses
+      BillingMode: PAY_PER_REQUEST
+      AttributeDefinitions:
+        - AttributeName: courseId
+          AttributeType: S
+        - AttributeName: departmentId
+          AttributeType: S
+      KeySchema:
+        - AttributeName: courseId
+          KeyType: HASH
+      GlobalSecondaryIndexes:
+        - IndexName: departmentId-index
+          KeySchema:
+            - AttributeName: departmentId
+              KeyType: HASH
+          Projection:
+            ProjectionType: ALL
+      StreamSpecification:
+        StreamViewType: NEW_AND_OLD_IMAGES
+      PointInTimeRecoverySpecification:
+        PointInTimeRecoveryEnabled: true
+      Tags:
+        - Key: Environment
+          Value: !Ref EnvironmentName
+
+  CampusesTable:
+    Type: AWS::DynamoDB::Table
+    Properties:
+      TableName: aitutor_campuses
+      BillingMode: PAY_PER_REQUEST
+      AttributeDefinitions:
+        - AttributeName: campusId
+          AttributeType: S
+      KeySchema:
+        - AttributeName: campusId
+          KeyType: HASH
+      StreamSpecification:
+        StreamViewType: NEW_AND_OLD_IMAGES
+      PointInTimeRecoverySpecification:
+        PointInTimeRecoveryEnabled: true
+      Tags:
+        - Key: Environment
+          Value: !Ref EnvironmentName
+
+  # AI & Chat Tables
+  ChatSessionsTable:
+    Type: AWS::DynamoDB::Table
+    Properties:
+      TableName: aitutor_chat_sessions
+      BillingMode: PAY_PER_REQUEST
+      AttributeDefinitions:
+        - AttributeName: sessionId
+          AttributeType: S
+        - AttributeName: studentId
+          AttributeType: S
+        - AttributeName: createdAt
+          AttributeType: N
+      KeySchema:
+        - AttributeName: sessionId
+          KeyType: HASH
+      GlobalSecondaryIndexes:
+        - IndexName: studentId-index
+          KeySchema:
+            - AttributeName: studentId
+              KeyType: HASH
+            - AttributeName: createdAt
+              KeyType: RANGE
+          Projection:
+            ProjectionType: ALL
+      StreamSpecification:
+        StreamViewType: NEW_AND_OLD_IMAGES
+      TimeToLiveSpecification:
+        AttributeName: expiresAt
+        Enabled: true
+      PointInTimeRecoverySpecification:
+        PointInTimeRecoveryEnabled: true
+      Tags:
+        - Key: Environment
+          Value: !Ref EnvironmentName
+
+  ChatMessagesTable:
+    Type: AWS::DynamoDB::Table
+    Properties:
+      TableName: aitutor_chat_messages
+      BillingMode: PAY_PER_REQUEST
+      AttributeDefinitions:
+        - AttributeName: messageId
+          AttributeType: S
+        - AttributeName: sessionId
+          AttributeType: S
+      KeySchema:
+        - AttributeName: messageId
+          KeyType: HASH
+      GlobalSecondaryIndexes:
+        - IndexName: sessionId-index
+          KeySchema:
+            - AttributeName: sessionId
+              KeyType: HASH
+          Projection:
+            ProjectionType: ALL
+      StreamSpecification:
+        StreamViewType: NEW_AND_OLD_IMAGES
+      TimeToLiveSpecification:
+        AttributeName: expiresAt
+        Enabled: true
+      PointInTimeRecoverySpecification:
+        PointInTimeRecoveryEnabled: true
+      Tags:
+        - Key: Environment
+          Value: !Ref EnvironmentName
+
+  AuditLogsTable:
+    Type: AWS::DynamoDB::Table
+    Properties:
+      TableName: aitutor_audit_logs
+      BillingMode: PAY_PER_REQUEST
+      AttributeDefinitions:
+        - AttributeName: logId
+          AttributeType: S
+        - AttributeName: userId
+          AttributeType: S
+        - AttributeName: timestamp
+          AttributeType: N
+      KeySchema:
+        - AttributeName: logId
+          KeyType: HASH
+      GlobalSecondaryIndexes:
+        - IndexName: userId-index
+          KeySchema:
+            - AttributeName: userId
+              KeyType: HASH
+            - AttributeName: timestamp
+              KeyType: RANGE
+          Projection:
+            ProjectionType: ALL
+      StreamSpecification:
+        StreamViewType: NEW_AND_OLD_IMAGES
+      TimeToLiveSpecification:
+        AttributeName: ttl
+        Enabled: true
+      Tags:
+        - Key: Environment
+          Value: !Ref EnvironmentName
+
+  QuizResultsTable:
+    Type: AWS::DynamoDB::Table
+    Properties:
+      TableName: aitutor_quiz_results
+      BillingMode: PAY_PER_REQUEST
+      AttributeDefinitions:
+        - AttributeName: quizId
+          AttributeType: S
+        - AttributeName: studentId
+          AttributeType: S
+      KeySchema:
+        - AttributeName: quizId
+          KeyType: HASH
+      GlobalSecondaryIndexes:
+        - IndexName: studentId-index
+          KeySchema:
+            - AttributeName: studentId
+              KeyType: HASH
+          Projection:
+            ProjectionType: ALL
+      StreamSpecification:
+        StreamViewType: NEW_AND_OLD_IMAGES
+      TimeToLiveSpecification:
+        AttributeName: expiresAt
+        Enabled: true
+      Tags:
+        - Key: Environment
+          Value: !Ref EnvironmentName
+
+  SummaryResultsTable:
+    Type: AWS::DynamoDB::Table
+    Properties:
+      TableName: aitutor_summary_results
+      BillingMode: PAY_PER_REQUEST
+      AttributeDefinitions:
+        - AttributeName: summaryId
+          AttributeType: S
+        - AttributeName: studentId
+          AttributeType: S
+      KeySchema:
+        - AttributeName: summaryId
+          KeyType: HASH
+      GlobalSecondaryIndexes:
+        - IndexName: studentId-index
+          KeySchema:
+            - AttributeName: studentId
+              KeyType: HASH
+          Projection:
+            ProjectionType: ALL
+      StreamSpecification:
+        StreamViewType: NEW_AND_OLD_IMAGES
+      TimeToLiveSpecification:
+        AttributeName: expiresAt
+        Enabled: true
+      Tags:
+        - Key: Environment
+          Value: !Ref EnvironmentName
+
+  # ==================== S3 BUCKETS ====================
+  CourseFilesBucket:
+    Type: AWS::S3::Bucket
+    Properties:
+      BucketName: !Sub 'aitutor-files-${EnvironmentName}-${AWS::AccountId}'
+      VersioningConfiguration:
+        Status: Enabled
+      BucketEncryption:
+        ServerSideEncryptionConfiguration:
+          - ServerSideEncryptionByDefault:
+              SSEAlgorithm: AES256
+      PublicAccessBlockConfiguration:
+        BlockPublicAcls: true
+        BlockPublicPolicy: true
+        IgnorePublicAcls: true
+        RestrictPublicBuckets: true
+      Tags:
+        - Key: Environment
+          Value: !Ref EnvironmentName
+        - Key: Purpose
+          Value: CourseFiles
+
+  LogsBucket:
+    Type: AWS::S3::Bucket
+    Properties:
+      BucketName: !Sub 'aitutor-logs-${EnvironmentName}-${AWS::AccountId}'
+      VersioningConfiguration:
+        Status: Enabled
+      BucketEncryption:
+        ServerSideEncryptionConfiguration:
+          - ServerSideEncryptionByDefault:
+              SSEAlgorithm: AES256
+      PublicAccessBlockConfiguration:
+        BlockPublicAcls: true
+        BlockPublicPolicy: true
+        IgnorePublicAcls: true
+        RestrictPublicBuckets: true
+      Tags:
+        - Key: Environment
+          Value: !Ref EnvironmentName
+        - Key: Purpose
+          Value: Logs
+
+  # ==================== LAMBDA FUNCTIONS (18 total) ====================
+  # Auth Functions (4)
+  AuthRegisterFunction:
+    Type: AWS::Lambda::Function
+    Properties:
+      FunctionName: !Sub 'tutorverse-auth-register-${EnvironmentName}'
+      Runtime: nodejs18.x
+      Handler: dist/lambda/auth/register.handler
+      Role: !GetAtt LambdaExecutionRole.Arn
+      Timeout: 30
+      MemorySize: 256
+      Code:
+        S3Bucket: !Ref LambdaCodeBucket
+        S3Key: !Ref LambdaCodeZipKey
+      Environment:
+        Variables:
+          ENVIRONMENT: !Ref EnvironmentName
+          REGION: !Ref AWS::Region
+          COGNITO_USER_POOL_ID: !Ref TutorVerseUserPool
+      Tags:
+        - Key: Environment
+          Value: !Ref EnvironmentName
+
+  AuthLoginFunction:
+    Type: AWS::Lambda::Function
+    Properties:
+      FunctionName: !Sub 'tutorverse-auth-login-${EnvironmentName}'
+      Runtime: nodejs18.x
+      Handler: dist/lambda/auth/login.handler
+      Role: !GetAtt LambdaExecutionRole.Arn
+      Timeout: 30
+      MemorySize: 256
+      Code:
+        S3Bucket: !Ref LambdaCodeBucket
+        S3Key: !Ref LambdaCodeZipKey
+      Environment:
+        Variables:
+          ENVIRONMENT: !Ref EnvironmentName
+          REGION: !Ref AWS::Region
+          COGNITO_USER_POOL_ID: !Ref TutorVerseUserPool
+      Tags:
+        - Key: Environment
+          Value: !Ref EnvironmentName
+
+  AuthRefreshFunction:
+    Type: AWS::Lambda::Function
+    Properties:
+      FunctionName: !Sub 'tutorverse-auth-refresh-${EnvironmentName}'
+      Runtime: nodejs18.x
+      Handler: dist/lambda/auth/refresh.handler
+      Role: !GetAtt LambdaExecutionRole.Arn
+      Timeout: 30
+      MemorySize: 256
+      Code:
+        S3Bucket: !Ref LambdaCodeBucket
+        S3Key: !Ref LambdaCodeZipKey
+      Environment:
+        Variables:
+          ENVIRONMENT: !Ref EnvironmentName
+          REGION: !Ref AWS::Region
+      Tags:
+        - Key: Environment
+          Value: !Ref EnvironmentName
+
+  AuthActivationFunction:
+    Type: AWS::Lambda::Function
+    Properties:
+      FunctionName: !Sub 'tutorverse-auth-register-activation-${EnvironmentName}'
+      Runtime: nodejs18.x
+      Handler: dist/lambda/auth/register-activation.handler
+      Role: !GetAtt LambdaExecutionRole.Arn
+      Timeout: 30
+      MemorySize: 256
+      Code:
+        S3Bucket: !Ref LambdaCodeBucket
+        S3Key: !Ref LambdaCodeZipKey
+      Environment:
+        Variables:
+          ENVIRONMENT: !Ref EnvironmentName
+          REGION: !Ref AWS::Region
+          COGNITO_USER_POOL_ID: !Ref TutorVerseUserPool
+      Tags:
+        - Key: Environment
+          Value: !Ref EnvironmentName
+
+  # Admin Functions (8)
+  AdminDepartmentsFunction:
+    Type: AWS::Lambda::Function
+    Properties:
+      FunctionName: !Sub 'tutorverse-admin-departments-${EnvironmentName}'
+      Runtime: nodejs18.x
+      Handler: dist/lambda/admin/departments.handler
+      Role: !GetAtt LambdaExecutionRole.Arn
+      Timeout: 30
+      MemorySize: 256
+      Code:
+        S3Bucket: !Ref LambdaCodeBucket
+        S3Key: !Ref LambdaCodeZipKey
+      Environment:
+        Variables:
+          ENVIRONMENT: !Ref EnvironmentName
+          REGION: !Ref AWS::Region
+      Tags:
+        - Key: Environment
+          Value: !Ref EnvironmentName
+
+  AdminFacultiesFunction:
+    Type: AWS::Lambda::Function
+    Properties:
+      FunctionName: !Sub 'tutorverse-admin-faculties-${EnvironmentName}'
+      Runtime: nodejs18.x
+      Handler: dist/lambda/admin/faculties.handler
+      Role: !GetAtt LambdaExecutionRole.Arn
+      Timeout: 30
+      MemorySize: 256
+      Code:
+        S3Bucket: !Ref LambdaCodeBucket
+        S3Key: !Ref LambdaCodeZipKey
+      Environment:
+        Variables:
+          ENVIRONMENT: !Ref EnvironmentName
+          REGION: !Ref AWS::Region
+      Tags:
+        - Key: Environment
+          Value: !Ref EnvironmentName
+
+  AdminCampusesFunction:
+    Type: AWS::Lambda::Function
+    Properties:
+      FunctionName: !Sub 'tutorverse-admin-campuses-${EnvironmentName}'
+      Runtime: nodejs18.x
+      Handler: dist/lambda/admin/campuses.handler
+      Role: !GetAtt LambdaExecutionRole.Arn
+      Timeout: 30
+      MemorySize: 256
+      Code:
+        S3Bucket: !Ref LambdaCodeBucket
+        S3Key: !Ref LambdaCodeZipKey
+      Environment:
+        Variables:
+          ENVIRONMENT: !Ref EnvironmentName
+          REGION: !Ref AWS::Region
+      Tags:
+        - Key: Environment
+          Value: !Ref EnvironmentName
+
+  AdminCoursesFunction:
+    Type: AWS::Lambda::Function
+    Properties:
+      FunctionName: !Sub 'tutorverse-admin-courses-${EnvironmentName}'
+      Runtime: nodejs18.x
+      Handler: dist/lambda/admin/courses.handler
+      Role: !GetAtt LambdaExecutionRole.Arn
+      Timeout: 30
+      MemorySize: 256
+      Code:
+        S3Bucket: !Ref LambdaCodeBucket
+        S3Key: !Ref LambdaCodeZipKey
+      Environment:
+        Variables:
+          ENVIRONMENT: !Ref EnvironmentName
+          REGION: !Ref AWS::Region
+      Tags:
+        - Key: Environment
+          Value: !Ref EnvironmentName
+
+  AdminModulesFunction:
+    Type: AWS::Lambda::Function
+    Properties:
+      FunctionName: !Sub 'tutorverse-admin-modules-${EnvironmentName}'
+      Runtime: nodejs18.x
+      Handler: dist/lambda/admin/modules.handler
+      Role: !GetAtt LambdaExecutionRole.Arn
+      Timeout: 30
+      MemorySize: 256
+      Code:
+        S3Bucket: !Ref LambdaCodeBucket
+        S3Key: !Ref LambdaCodeZipKey
+      Environment:
+        Variables:
+          ENVIRONMENT: !Ref EnvironmentName
+          REGION: !Ref AWS::Region
+      Tags:
+        - Key: Environment
+          Value: !Ref EnvironmentName
+
+  AdminLecturersFunction:
+    Type: AWS::Lambda::Function
+    Properties:
+      FunctionName: !Sub 'tutorverse-admin-lecturers-${EnvironmentName}'
+      Runtime: nodejs18.x
+      Handler: dist/lambda/admin/lecturers.handler
+      Role: !GetAtt LambdaExecutionRole.Arn
+      Timeout: 30
+      MemorySize: 256
+      Code:
+        S3Bucket: !Ref LambdaCodeBucket
+        S3Key: !Ref LambdaCodeZipKey
+      Environment:
+        Variables:
+          ENVIRONMENT: !Ref EnvironmentName
+          REGION: !Ref AWS::Region
+      Tags:
+        - Key: Environment
+          Value: !Ref EnvironmentName
+
+  AdminStudentsFunction:
+    Type: AWS::Lambda::Function
+    Properties:
+      FunctionName: !Sub 'tutorverse-admin-students-${EnvironmentName}'
+      Runtime: nodejs18.x
+      Handler: dist/lambda/admin/students.handler
+      Role: !GetAtt LambdaExecutionRole.Arn
+      Timeout: 30
+      MemorySize: 256
+      Code:
+        S3Bucket: !Ref LambdaCodeBucket
+        S3Key: !Ref LambdaCodeZipKey
+      Environment:
+        Variables:
+          ENVIRONMENT: !Ref EnvironmentName
+          REGION: !Ref AWS::Region
+      Tags:
+        - Key: Environment
+          Value: !Ref EnvironmentName
+
+  AdminFilesFunction:
+    Type: AWS::Lambda::Function
+    Properties:
+      FunctionName: !Sub 'tutorverse-admin-files-${EnvironmentName}'
+      Runtime: nodejs18.x
+      Handler: dist/lambda/admin/files.handler
+      Role: !GetAtt LambdaExecutionRole.Arn
+      Timeout: 30
+      MemorySize: 256
+      Code:
+        S3Bucket: !Ref LambdaCodeBucket
+        S3Key: !Ref LambdaCodeZipKey
+      Environment:
+        Variables:
+          ENVIRONMENT: !Ref EnvironmentName
+          REGION: !Ref AWS::Region
+      Tags:
+        - Key: Environment
+          Value: !Ref EnvironmentName
+
+  # Educator Functions (3)
+  EducatorHandlerFunction:
+    Type: AWS::Lambda::Function
+    Properties:
+      FunctionName: !Sub 'tutorverse-educator-handler-${EnvironmentName}'
+      Runtime: nodejs18.x
+      Handler: dist/lambda/educator/handler.handler
+      Role: !GetAtt LambdaExecutionRole.Arn
+      Timeout: 30
+      MemorySize: 256
+      Code:
+        S3Bucket: !Ref LambdaCodeBucket
+        S3Key: !Ref LambdaCodeZipKey
+      Environment:
+        Variables:
+          ENVIRONMENT: !Ref EnvironmentName
+          REGION: !Ref AWS::Region
+      Tags:
+        - Key: Environment
+          Value: !Ref EnvironmentName
+
+  EducatorFilesFunction:
+    Type: AWS::Lambda::Function
+    Properties:
+      FunctionName: !Sub 'tutorverse-educator-files-${EnvironmentName}'
+      Runtime: nodejs18.x
+      Handler: dist/lambda/educator/files.handler
+      Role: !GetAtt LambdaExecutionRole.Arn
+      Timeout: 30
+      MemorySize: 256
+      Code:
+        S3Bucket: !Ref LambdaCodeBucket
+        S3Key: !Ref LambdaCodeZipKey
+      Environment:
+        Variables:
+          ENVIRONMENT: !Ref EnvironmentName
+          REGION: !Ref AWS::Region
+          S3_BUCKET: !Ref CourseFilesBucket
+      Tags:
+        - Key: Environment
+          Value: !Ref EnvironmentName
+
+  EducatorPortalFilesFunction:
+    Type: AWS::Lambda::Function
+    Properties:
+      FunctionName: !Sub 'tutorverse-educator-portal-files-${EnvironmentName}'
+      Runtime: nodejs18.x
+      Handler: dist/lambda/educator/portal-files.handler
+      Role: !GetAtt LambdaExecutionRole.Arn
+      Timeout: 30
+      MemorySize: 256
+      Code:
+        S3Bucket: !Ref LambdaCodeBucket
+        S3Key: !Ref LambdaCodeZipKey
+      Environment:
+        Variables:
+          ENVIRONMENT: !Ref EnvironmentName
+          REGION: !Ref AWS::Region
+          S3_BUCKET: !Ref CourseFilesBucket
+      Tags:
+        - Key: Environment
+          Value: !Ref EnvironmentName
+
+  # Student Functions (3)
+  StudentHandlerFunction:
+    Type: AWS::Lambda::Function
+    Properties:
+      FunctionName: !Sub 'tutorverse-student-handler-${EnvironmentName}'
+      Runtime: nodejs18.x
+      Handler: dist/lambda/student/handler.handler
+      Role: !GetAtt LambdaExecutionRole.Arn
+      Timeout: 30
+      MemorySize: 256
+      Code:
+        S3Bucket: !Ref LambdaCodeBucket
+        S3Key: !Ref LambdaCodeZipKey
+      Environment:
+        Variables:
+          ENVIRONMENT: !Ref EnvironmentName
+          REGION: !Ref AWS::Region
+      Tags:
+        - Key: Environment
+          Value: !Ref EnvironmentName
+
+  StudentProfileFunction:
+    Type: AWS::Lambda::Function
+    Properties:
+      FunctionName: !Sub 'tutorverse-student-profile-${EnvironmentName}'
+      Runtime: nodejs18.x
+      Handler: dist/lambda/student/profile.handler
+      Role: !GetAtt LambdaExecutionRole.Arn
+      Timeout: 30
+      MemorySize: 256
+      Code:
+        S3Bucket: !Ref LambdaCodeBucket
+        S3Key: !Ref LambdaCodeZipKey
+      Environment:
+        Variables:
+          ENVIRONMENT: !Ref EnvironmentName
+          REGION: !Ref AWS::Region
+      Tags:
+        - Key: Environment
+          Value: !Ref EnvironmentName
+
+  StudentFilesFunction:
+    Type: AWS::Lambda::Function
+    Properties:
+      FunctionName: !Sub 'tutorverse-student-files-${EnvironmentName}'
+      Runtime: nodejs18.x
+      Handler: dist/lambda/student/files.handler
+      Role: !GetAtt LambdaExecutionRole.Arn
+      Timeout: 30
+      MemorySize: 256
+      Code:
+        S3Bucket: !Ref LambdaCodeBucket
+        S3Key: !Ref LambdaCodeZipKey
+      Environment:
+        Variables:
+          ENVIRONMENT: !Ref EnvironmentName
+          REGION: !Ref AWS::Region
+          S3_BUCKET: !Ref CourseFilesBucket
+      Tags:
+        - Key: Environment
+          Value: !Ref EnvironmentName
+
+  # AI Functions (3)
+  AIChatFunction:
+    Type: AWS::Lambda::Function
+    Properties:
+      FunctionName: !Sub 'tutorverse-ai-chat-${EnvironmentName}'
+      Runtime: nodejs18.x
+      Handler: dist/lambda/ai/chat.handler
+      Role: !GetAtt LambdaExecutionRole.Arn
+      Timeout: 60
+      MemorySize: 512
+      Code:
+        S3Bucket: !Ref LambdaCodeBucket
+        S3Key: !Ref LambdaCodeZipKey
+      Environment:
+        Variables:
+          ENVIRONMENT: !Ref EnvironmentName
+          REGION: !Ref AWS::Region
+      Tags:
+        - Key: Environment
+          Value: !Ref EnvironmentName
+
+  AIQuizFunction:
+    Type: AWS::Lambda::Function
+    Properties:
+      FunctionName: !Sub 'tutorverse-ai-quiz-${EnvironmentName}'
+      Runtime: nodejs18.x
+      Handler: dist/lambda/ai/quiz.handler
+      Role: !GetAtt LambdaExecutionRole.Arn
+      Timeout: 60
+      MemorySize: 512
+      Code:
+        S3Bucket: !Ref LambdaCodeBucket
+        S3Key: !Ref LambdaCodeZipKey
+      Environment:
+        Variables:
+          ENVIRONMENT: !Ref EnvironmentName
+          REGION: !Ref AWS::Region
+      Tags:
+        - Key: Environment
+          Value: !Ref EnvironmentName
+
+  AISummaryFunction:
+    Type: AWS::Lambda::Function
+    Properties:
+      FunctionName: !Sub 'tutorverse-ai-summary-${EnvironmentName}'
+      Runtime: nodejs18.x
+      Handler: dist/lambda/ai/summary.handler
+      Role: !GetAtt LambdaExecutionRole.Arn
+      Timeout: 60
+      MemorySize: 512
+      Code:
+        S3Bucket: !Ref LambdaCodeBucket
+        S3Key: !Ref LambdaCodeZipKey
+      Environment:
+        Variables:
+          ENVIRONMENT: !Ref EnvironmentName
+          REGION: !Ref AWS::Region
+      Tags:
+        - Key: Environment
+          Value: !Ref EnvironmentName
+
+  # ==================== API GATEWAY ====================
+  TutorVerseApi:
+    Type: AWS::ApiGateway::RestApi
+    Properties:
+      Name: !Sub 'tutorverse-api-${EnvironmentName}'
+      Description: TutorVerse REST API with Cognito authorization
+      EndpointConfiguration:
+        Types:
+          - REGIONAL
+
+  TutorVerseCognitoAuthorizer:
+    Type: AWS::ApiGateway::Authorizer
+    Properties:
+      Name: TutorVerseCognitoAuthorizer
+      Type: COGNITO_USER_POOLS
+      IdentitySource: method.request.header.Authorization
+      RestApiId: !Ref TutorVerseApi
+      ProviderARNs:
+        - !GetAtt TutorVerseUserPool.Arn
+
+  # API Resources
+  ApiResource:
+    Type: AWS::ApiGateway::Resource
+    Properties:
+      RestApiId: !Ref TutorVerseApi
+      ParentId: !GetAtt TutorVerseApi.RootResourceId
+      PathPart: api
+
+  AuthResource:
+    Type: AWS::ApiGateway::Resource
+    Properties:
+      RestApiId: !Ref TutorVerseApi
+      ParentId: !GetAtt TutorVerseApi.RootResourceId
+      PathPart: auth
+
+  AuthLoginResource:
+    Type: AWS::ApiGateway::Resource
+    Properties:
+      RestApiId: !Ref TutorVerseApi
+      ParentId: !Ref AuthResource
+      PathPart: login
+
+  AuthRegisterResource:
+    Type: AWS::ApiGateway::Resource
+    Properties:
+      RestApiId: !Ref TutorVerseApi
+      ParentId: !Ref AuthResource
+      PathPart: register
+
+  AuthRefreshResource:
+    Type: AWS::ApiGateway::Resource
+    Properties:
+      RestApiId: !Ref TutorVerseApi
+      ParentId: !Ref AuthResource
+      PathPart: refresh
+
+  # Student Resources
+  StudentResource:
+    Type: AWS::ApiGateway::Resource
+    Properties:
+      RestApiId: !Ref TutorVerseApi
+      ParentId: !Ref ApiResource
+      PathPart: student
+
+  StudentProfileResource:
+    Type: AWS::ApiGateway::Resource
+    Properties:
+      RestApiId: !Ref TutorVerseApi
+      ParentId: !Ref StudentResource
+      PathPart: profile
+
+  StudentModulesResource:
+    Type: AWS::ApiGateway::Resource
+    Properties:
+      RestApiId: !Ref TutorVerseApi
+      ParentId: !Ref StudentResource
+      PathPart: modules
+
+  StudentFilesResource:
+    Type: AWS::ApiGateway::Resource
+    Properties:
+      RestApiId: !Ref TutorVerseApi
+      ParentId: !Ref StudentResource
+      PathPart: files
+
+  # Educator Resources
+  EducatorResource:
+    Type: AWS::ApiGateway::Resource
+    Properties:
+      RestApiId: !Ref TutorVerseApi
+      ParentId: !Ref ApiResource
+      PathPart: educator
+
+  EducatorProfileResource:
+    Type: AWS::ApiGateway::Resource
+    Properties:
+      RestApiId: !Ref TutorVerseApi
+      ParentId: !Ref EducatorResource
+      PathPart: profile
+
+  EducatorModulesResource:
+    Type: AWS::ApiGateway::Resource
+    Properties:
+      RestApiId: !Ref TutorVerseApi
+      ParentId: !Ref EducatorResource
+      PathPart: modules
+
+  EducatorFilesResource:
+    Type: AWS::ApiGateway::Resource
+    Properties:
+      RestApiId: !Ref TutorVerseApi
+      ParentId: !Ref EducatorResource
+      PathPart: files
+
+  # Admin Resources
+  AdminResource:
+    Type: AWS::ApiGateway::Resource
+    Properties:
+      RestApiId: !Ref TutorVerseApi
+      ParentId: !Ref ApiResource
+      PathPart: admin
+
+  AdminDepartmentsResource:
+    Type: AWS::ApiGateway::Resource
+    Properties:
+      RestApiId: !Ref TutorVerseApi
+      ParentId: !Ref AdminResource
+      PathPart: departments
+
+  AdminFacultiesResource:
+    Type: AWS::ApiGateway::Resource
+    Properties:
+      RestApiId: !Ref TutorVerseApi
+      ParentId: !Ref AdminResource
+      PathPart: faculties
+
+  AdminCampusesResource:
+    Type: AWS::ApiGateway::Resource
+    Properties:
+      RestApiId: !Ref TutorVerseApi
+      ParentId: !Ref AdminResource
+      PathPart: campuses
+
+  AdminCoursesResource:
+    Type: AWS::ApiGateway::Resource
+    Properties:
+      RestApiId: !Ref TutorVerseApi
+      ParentId: !Ref AdminResource
+      PathPart: courses
+
+  AdminModulesResource:
+    Type: AWS::ApiGateway::Resource
+    Properties:
+      RestApiId: !Ref TutorVerseApi
+      ParentId: !Ref AdminResource
+      PathPart: modules
+
+  AdminLecturersResource:
+    Type: AWS::ApiGateway::Resource
+    Properties:
+      RestApiId: !Ref TutorVerseApi
+      ParentId: !Ref AdminResource
+      PathPart: lecturers
+
+  AdminStudentsResource:
+    Type: AWS::ApiGateway::Resource
+    Properties:
+      RestApiId: !Ref TutorVerseApi
+      ParentId: !Ref AdminResource
+      PathPart: students
+
+  AdminFilesResource:
+    Type: AWS::ApiGateway::Resource
+    Properties:
+      RestApiId: !Ref TutorVerseApi
+      ParentId: !Ref AdminResource
+      PathPart: files
+
+  # AI Resources
+  AiResource:
+    Type: AWS::ApiGateway::Resource
+    Properties:
+      RestApiId: !Ref TutorVerseApi
+      ParentId: !Ref ApiResource
+      PathPart: ai
+
+  AiChatResource:
+    Type: AWS::ApiGateway::Resource
+    Properties:
+      RestApiId: !Ref TutorVerseApi
+      ParentId: !Ref AiResource
+      PathPart: chat
+
+  AiQuizResource:
+    Type: AWS::ApiGateway::Resource
+    Properties:
+      RestApiId: !Ref TutorVerseApi
+      ParentId: !Ref AiResource
+      PathPart: quiz
+
+  AiSummaryResource:
+    Type: AWS::ApiGateway::Resource
+    Properties:
+      RestApiId: !Ref TutorVerseApi
+      ParentId: !Ref AiResource
+      PathPart: summary
+
+  # ==================== API METHODS - AUTH ====================
+  AuthLoginMethod:
+    Type: AWS::ApiGateway::Method
+    Properties:
+      RestApiId: !Ref TutorVerseApi
+      ResourceId: !Ref AuthLoginResource
+      HttpMethod: POST
+      AuthorizationType: NONE
+      Integration:
+        Type: AWS_PROXY
+        IntegrationHttpMethod: POST
+        Uri: !Sub 'arn:aws:apigateway:${AWS::Region}:lambda:path/2015-03-31/functions/${AuthLoginFunction.Arn}/invocations'
+
+  AuthRegisterMethod:
+    Type: AWS::ApiGateway::Method
+    Properties:
+      RestApiId: !Ref TutorVerseApi
+      ResourceId: !Ref AuthRegisterResource
+      HttpMethod: POST
+      AuthorizationType: NONE
+      Integration:
+        Type: AWS_PROXY
+        IntegrationHttpMethod: POST
+        Uri: !Sub 'arn:aws:apigateway:${AWS::Region}:lambda:path/2015-03-31/functions/${AuthRegisterFunction.Arn}/invocations'
+
+  AuthRefreshMethod:
+    Type: AWS::ApiGateway::Method
+    Properties:
+      RestApiId: !Ref TutorVerseApi
+      ResourceId: !Ref AuthRefreshResource
+      HttpMethod: POST
+      AuthorizationType: NONE
+      Integration:
+        Type: AWS_PROXY
+        IntegrationHttpMethod: POST
+        Uri: !Sub 'arn:aws:apigateway:${AWS::Region}:lambda:path/2015-03-31/functions/${AuthRefreshFunction.Arn}/invocations'
+
+  # ==================== API METHODS - STUDENT ====================
+  StudentProfileGetMethod:
+    Type: AWS::ApiGateway::Method
+    Properties:
+      RestApiId: !Ref TutorVerseApi
+      ResourceId: !Ref StudentProfileResource
+      HttpMethod: GET
+      AuthorizationType: COGNITO_USER_POOLS
+      AuthorizerId: !Ref TutorVerseCognitoAuthorizer
+      Integration:
+        Type: AWS_PROXY
+        IntegrationHttpMethod: POST
+        Uri: !Sub 'arn:aws:apigateway:${AWS::Region}:lambda:path/2015-03-31/functions/${StudentProfileFunction.Arn}/invocations'
+
+  StudentModulesGetMethod:
+    Type: AWS::ApiGateway::Method
+    Properties:
+      RestApiId: !Ref TutorVerseApi
+      ResourceId: !Ref StudentModulesResource
+      HttpMethod: GET
+      AuthorizationType: COGNITO_USER_POOLS
+      AuthorizerId: !Ref TutorVerseCognitoAuthorizer
+      Integration:
+        Type: AWS_PROXY
+        IntegrationHttpMethod: POST
+        Uri: !Sub 'arn:aws:apigateway:${AWS::Region}:lambda:path/2015-03-31/functions/${StudentHandlerFunction.Arn}/invocations'
+
+  StudentFilesGetMethod:
+    Type: AWS::ApiGateway::Method
+    Properties:
+      RestApiId: !Ref TutorVerseApi
+      ResourceId: !Ref StudentFilesResource
+      HttpMethod: GET
+      AuthorizationType: COGNITO_USER_POOLS
+      AuthorizerId: !Ref TutorVerseCognitoAuthorizer
+      Integration:
+        Type: AWS_PROXY
+        IntegrationHttpMethod: POST
+        Uri: !Sub 'arn:aws:apigateway:${AWS::Region}:lambda:path/2015-03-31/functions/${StudentFilesFunction.Arn}/invocations'
+
+  # ==================== API METHODS - EDUCATOR ====================
+  EducatorProfileGetMethod:
+    Type: AWS::ApiGateway::Method
+    Properties:
+      RestApiId: !Ref TutorVerseApi
+      ResourceId: !Ref EducatorProfileResource
+      HttpMethod: GET
+      AuthorizationType: COGNITO_USER_POOLS
+      AuthorizerId: !Ref TutorVerseCognitoAuthorizer
+      Integration:
+        Type: AWS_PROXY
+        IntegrationHttpMethod: POST
+        Uri: !Sub 'arn:aws:apigateway:${AWS::Region}:lambda:path/2015-03-31/functions/${EducatorHandlerFunction.Arn}/invocations'
+
+  EducatorModulesGetMethod:
+    Type: AWS::ApiGateway::Method
+    Properties:
+      RestApiId: !Ref TutorVerseApi
+      ResourceId: !Ref EducatorModulesResource
+      HttpMethod: GET
+      AuthorizationType: COGNITO_USER_POOLS
+      AuthorizerId: !Ref TutorVerseCognitoAuthorizer
+      Integration:
+        Type: AWS_PROXY
+        IntegrationHttpMethod: POST
+        Uri: !Sub 'arn:aws:apigateway:${AWS::Region}:lambda:path/2015-03-31/functions/${EducatorHandlerFunction.Arn}/invocations'
+
+  EducatorFilesGetMethod:
+    Type: AWS::ApiGateway::Method
+    Properties:
+      RestApiId: !Ref TutorVerseApi
+      ResourceId: !Ref EducatorFilesResource
+      HttpMethod: GET
+      AuthorizationType: COGNITO_USER_POOLS
+      AuthorizerId: !Ref TutorVerseCognitoAuthorizer
+      Integration:
+        Type: AWS_PROXY
+        IntegrationHttpMethod: POST
+        Uri: !Sub 'arn:aws:apigateway:${AWS::Region}:lambda:path/2015-03-31/functions/${EducatorPortalFilesFunction.Arn}/invocations'
+
+  EducatorFilesPostMethod:
+    Type: AWS::ApiGateway::Method
+    Properties:
+      RestApiId: !Ref TutorVerseApi
+      ResourceId: !Ref EducatorFilesResource
+      HttpMethod: POST
+      AuthorizationType: COGNITO_USER_POOLS
+      AuthorizerId: !Ref TutorVerseCognitoAuthorizer
+      Integration:
+        Type: AWS_PROXY
+        IntegrationHttpMethod: POST
+        Uri: !Sub 'arn:aws:apigateway:${AWS::Region}:lambda:path/2015-03-31/functions/${EducatorPortalFilesFunction.Arn}/invocations'
+
+  # ==================== API METHODS - ADMIN ====================
+  AdminDepartmentsGetMethod:
+    Type: AWS::ApiGateway::Method
+    Properties:
+      RestApiId: !Ref TutorVerseApi
+      ResourceId: !Ref AdminDepartmentsResource
+      HttpMethod: GET
+      AuthorizationType: COGNITO_USER_POOLS
+      AuthorizerId: !Ref TutorVerseCognitoAuthorizer
+      Integration:
+        Type: AWS_PROXY
+        IntegrationHttpMethod: POST
+        Uri: !Sub 'arn:aws:apigateway:${AWS::Region}:lambda:path/2015-03-31/functions/${AdminDepartmentsFunction.Arn}/invocations'
+
+  AdminDepartmentsPostMethod:
+    Type: AWS::ApiGateway::Method
+    Properties:
+      RestApiId: !Ref TutorVerseApi
+      ResourceId: !Ref AdminDepartmentsResource
+      HttpMethod: POST
+      AuthorizationType: COGNITO_USER_POOLS
+      AuthorizerId: !Ref TutorVerseCognitoAuthorizer
+      Integration:
+        Type: AWS_PROXY
+        IntegrationHttpMethod: POST
+        Uri: !Sub 'arn:aws:apigateway:${AWS::Region}:lambda:path/2015-03-31/functions/${AdminDepartmentsFunction.Arn}/invocations'
+
+  AdminFacultiesGetMethod:
+    Type: AWS::ApiGateway::Method
+    Properties:
+      RestApiId: !Ref TutorVerseApi
+      ResourceId: !Ref AdminFacultiesResource
+      HttpMethod: GET
+      AuthorizationType: COGNITO_USER_POOLS
+      AuthorizerId: !Ref TutorVerseCognitoAuthorizer
+      Integration:
+        Type: AWS_PROXY
+        IntegrationHttpMethod: POST
+        Uri: !Sub 'arn:aws:apigateway:${AWS::Region}:lambda:path/2015-03-31/functions/${AdminFacultiesFunction.Arn}/invocations'
+
+  AdminFacultiesPostMethod:
+    Type: AWS::ApiGateway::Method
+    Properties:
+      RestApiId: !Ref TutorVerseApi
+      ResourceId: !Ref AdminFacultiesResource
+      HttpMethod: POST
+      AuthorizationType: COGNITO_USER_POOLS
+      AuthorizerId: !Ref TutorVerseCognitoAuthorizer
+      Integration:
+        Type: AWS_PROXY
+        IntegrationHttpMethod: POST
+        Uri: !Sub 'arn:aws:apigateway:${AWS::Region}:lambda:path/2015-03-31/functions/${AdminFacultiesFunction.Arn}/invocations'
+
+  AdminCampusesGetMethod:
+    Type: AWS::ApiGateway::Method
+    Properties:
+      RestApiId: !Ref TutorVerseApi
+      ResourceId: !Ref AdminCampusesResource
+      HttpMethod: GET
+      AuthorizationType: COGNITO_USER_POOLS
+      AuthorizerId: !Ref TutorVerseCognitoAuthorizer
+      Integration:
+        Type: AWS_PROXY
+        IntegrationHttpMethod: POST
+        Uri: !Sub 'arn:aws:apigateway:${AWS::Region}:lambda:path/2015-03-31/functions/${AdminCampusesFunction.Arn}/invocations'
+
+  AdminCampusesPostMethod:
+    Type: AWS::ApiGateway::Method
+    Properties:
+      RestApiId: !Ref TutorVerseApi
+      ResourceId: !Ref AdminCampusesResource
+      HttpMethod: POST
+      AuthorizationType: COGNITO_USER_POOLS
+      AuthorizerId: !Ref TutorVerseCognitoAuthorizer
+      Integration:
+        Type: AWS_PROXY
+        IntegrationHttpMethod: POST
+        Uri: !Sub 'arn:aws:apigateway:${AWS::Region}:lambda:path/2015-03-31/functions/${AdminCampusesFunction.Arn}/invocations'
+
+  AdminCoursesGetMethod:
+    Type: AWS::ApiGateway::Method
+    Properties:
+      RestApiId: !Ref TutorVerseApi
+      ResourceId: !Ref AdminCoursesResource
+      HttpMethod: GET
+      AuthorizationType: COGNITO_USER_POOLS
+      AuthorizerId: !Ref TutorVerseCognitoAuthorizer
+      Integration:
+        Type: AWS_PROXY
+        IntegrationHttpMethod: POST
+        Uri: !Sub 'arn:aws:apigateway:${AWS::Region}:lambda:path/2015-03-31/functions/${AdminCoursesFunction.Arn}/invocations'
+
+  AdminCoursesPostMethod:
+    Type: AWS::ApiGateway::Method
+    Properties:
+      RestApiId: !Ref TutorVerseApi
+      ResourceId: !Ref AdminCoursesResource
+      HttpMethod: POST
+      AuthorizationType: COGNITO_USER_POOLS
+      AuthorizerId: !Ref TutorVerseCognitoAuthorizer
+      Integration:
+        Type: AWS_PROXY
+        IntegrationHttpMethod: POST
+        Uri: !Sub 'arn:aws:apigateway:${AWS::Region}:lambda:path/2015-03-31/functions/${AdminCoursesFunction.Arn}/invocations'
+
+  AdminModulesGetMethod:
+    Type: AWS::ApiGateway::Method
+    Properties:
+      RestApiId: !Ref TutorVerseApi
+      ResourceId: !Ref AdminModulesResource
+      HttpMethod: GET
+      AuthorizationType: COGNITO_USER_POOLS
+      AuthorizerId: !Ref TutorVerseCognitoAuthorizer
+      Integration:
+        Type: AWS_PROXY
+        IntegrationHttpMethod: POST
+        Uri: !Sub 'arn:aws:apigateway:${AWS::Region}:lambda:path/2015-03-31/functions/${AdminModulesFunction.Arn}/invocations'
+
+  AdminModulesPostMethod:
+    Type: AWS::ApiGateway::Method
+    Properties:
+      RestApiId: !Ref TutorVerseApi
+      ResourceId: !Ref AdminModulesResource
+      HttpMethod: POST
+      AuthorizationType: COGNITO_USER_POOLS
+      AuthorizerId: !Ref TutorVerseCognitoAuthorizer
+      Integration:
+        Type: AWS_PROXY
+        IntegrationHttpMethod: POST
+        Uri: !Sub 'arn:aws:apigateway:${AWS::Region}:lambda:path/2015-03-31/functions/${AdminModulesFunction.Arn}/invocations'
+
+  AdminLecturersGetMethod:
+    Type: AWS::ApiGateway::Method
+    Properties:
+      RestApiId: !Ref TutorVerseApi
+      ResourceId: !Ref AdminLecturersResource
+      HttpMethod: GET
+      AuthorizationType: COGNITO_USER_POOLS
+      AuthorizerId: !Ref TutorVerseCognitoAuthorizer
+      Integration:
+        Type: AWS_PROXY
+        IntegrationHttpMethod: POST
+        Uri: !Sub 'arn:aws:apigateway:${AWS::Region}:lambda:path/2015-03-31/functions/${AdminLecturersFunction.Arn}/invocations'
+
+  AdminLecturersPostMethod:
+    Type: AWS::ApiGateway::Method
+    Properties:
+      RestApiId: !Ref TutorVerseApi
+      ResourceId: !Ref AdminLecturersResource
+      HttpMethod: POST
+      AuthorizationType: COGNITO_USER_POOLS
+      AuthorizerId: !Ref TutorVerseCognitoAuthorizer
+      Integration:
+        Type: AWS_PROXY
+        IntegrationHttpMethod: POST
+        Uri: !Sub 'arn:aws:apigateway:${AWS::Region}:lambda:path/2015-03-31/functions/${AdminLecturersFunction.Arn}/invocations'
+
+  AdminStudentsGetMethod:
+    Type: AWS::ApiGateway::Method
+    Properties:
+      RestApiId: !Ref TutorVerseApi
+      ResourceId: !Ref AdminStudentsResource
+      HttpMethod: GET
+      AuthorizationType: COGNITO_USER_POOLS
+      AuthorizerId: !Ref TutorVerseCognitoAuthorizer
+      Integration:
+        Type: AWS_PROXY
+        IntegrationHttpMethod: POST
+        Uri: !Sub 'arn:aws:apigateway:${AWS::Region}:lambda:path/2015-03-31/functions/${AdminStudentsFunction.Arn}/invocations'
+
+  AdminStudentsPostMethod:
+    Type: AWS::ApiGateway::Method
+    Properties:
+      RestApiId: !Ref TutorVerseApi
+      ResourceId: !Ref AdminStudentsResource
+      HttpMethod: POST
+      AuthorizationType: COGNITO_USER_POOLS
+      AuthorizerId: !Ref TutorVerseCognitoAuthorizer
+      Integration:
+        Type: AWS_PROXY
+        IntegrationHttpMethod: POST
+        Uri: !Sub 'arn:aws:apigateway:${AWS::Region}:lambda:path/2015-03-31/functions/${AdminStudentsFunction.Arn}/invocations'
+
+  AdminFilesGetMethod:
+    Type: AWS::ApiGateway::Method
+    Properties:
+      RestApiId: !Ref TutorVerseApi
+      ResourceId: !Ref AdminFilesResource
+      HttpMethod: GET
+      AuthorizationType: COGNITO_USER_POOLS
+      AuthorizerId: !Ref TutorVerseCognitoAuthorizer
+      Integration:
+        Type: AWS_PROXY
+        IntegrationHttpMethod: POST
+        Uri: !Sub 'arn:aws:apigateway:${AWS::Region}:lambda:path/2015-03-31/functions/${AdminFilesFunction.Arn}/invocations'
+
+  AdminFilesPostMethod:
+    Type: AWS::ApiGateway::Method
+    Properties:
+      RestApiId: !Ref TutorVerseApi
+      ResourceId: !Ref AdminFilesResource
+      HttpMethod: POST
+      AuthorizationType: COGNITO_USER_POOLS
+      AuthorizerId: !Ref TutorVerseCognitoAuthorizer
+      Integration:
+        Type: AWS_PROXY
+        IntegrationHttpMethod: POST
+        Uri: !Sub 'arn:aws:apigateway:${AWS::Region}:lambda:path/2015-03-31/functions/${AdminFilesFunction.Arn}/invocations'
+
+  # ==================== API METHODS - AI ====================
+  AiChatGetMethod:
+    Type: AWS::ApiGateway::Method
+    Properties:
+      RestApiId: !Ref TutorVerseApi
+      ResourceId: !Ref AiChatResource
+      HttpMethod: GET
+      AuthorizationType: COGNITO_USER_POOLS
+      AuthorizerId: !Ref TutorVerseCognitoAuthorizer
+      Integration:
+        Type: AWS_PROXY
+        IntegrationHttpMethod: POST
+        Uri: !Sub 'arn:aws:apigateway:${AWS::Region}:lambda:path/2015-03-31/functions/${AIChatFunction.Arn}/invocations'
+
+  AiChatPostMethod:
+    Type: AWS::ApiGateway::Method
+    Properties:
+      RestApiId: !Ref TutorVerseApi
+      ResourceId: !Ref AiChatResource
+      HttpMethod: POST
+      AuthorizationType: COGNITO_USER_POOLS
+      AuthorizerId: !Ref TutorVerseCognitoAuthorizer
+      Integration:
+        Type: AWS_PROXY
+        IntegrationHttpMethod: POST
+        Uri: !Sub 'arn:aws:apigateway:${AWS::Region}:lambda:path/2015-03-31/functions/${AIChatFunction.Arn}/invocations'
+
+  AiQuizGetMethod:
+    Type: AWS::ApiGateway::Method
+    Properties:
+      RestApiId: !Ref TutorVerseApi
+      ResourceId: !Ref AiQuizResource
+      HttpMethod: GET
+      AuthorizationType: COGNITO_USER_POOLS
+      AuthorizerId: !Ref TutorVerseCognitoAuthorizer
+      Integration:
+        Type: AWS_PROXY
+        IntegrationHttpMethod: POST
+        Uri: !Sub 'arn:aws:apigateway:${AWS::Region}:lambda:path/2015-03-31/functions/${AIQuizFunction.Arn}/invocations'
+
+  AiQuizPostMethod:
+    Type: AWS::ApiGateway::Method
+    Properties:
+      RestApiId: !Ref TutorVerseApi
+      ResourceId: !Ref AiQuizResource
+      HttpMethod: POST
+      AuthorizationType: COGNITO_USER_POOLS
+      AuthorizerId: !Ref TutorVerseCognitoAuthorizer
+      Integration:
+        Type: AWS_PROXY
+        IntegrationHttpMethod: POST
+        Uri: !Sub 'arn:aws:apigateway:${AWS::Region}:lambda:path/2015-03-31/functions/${AIQuizFunction.Arn}/invocations'
+
+  AiSummaryGetMethod:
+    Type: AWS::ApiGateway::Method
+    Properties:
+      RestApiId: !Ref TutorVerseApi
+      ResourceId: !Ref AiSummaryResource
+      HttpMethod: GET
+      AuthorizationType: COGNITO_USER_POOLS
+      AuthorizerId: !Ref TutorVerseCognitoAuthorizer
+      Integration:
+        Type: AWS_PROXY
+        IntegrationHttpMethod: POST
+        Uri: !Sub 'arn:aws:apigateway:${AWS::Region}:lambda:path/2015-03-31/functions/${AISummaryFunction.Arn}/invocations'
+
+  AiSummaryPostMethod:
+    Type: AWS::ApiGateway::Method
+    Properties:
+      RestApiId: !Ref TutorVerseApi
+      ResourceId: !Ref AiSummaryResource
+      HttpMethod: POST
+      AuthorizationType: COGNITO_USER_POOLS
+      AuthorizerId: !Ref TutorVerseCognitoAuthorizer
+      Integration:
+        Type: AWS_PROXY
+        IntegrationHttpMethod: POST
+        Uri: !Sub 'arn:aws:apigateway:${AWS::Region}:lambda:path/2015-03-31/functions/${AISummaryFunction.Arn}/invocations'
+
+  # API Gateway Deployment
+  ApiDeployment:
+    Type: AWS::ApiGateway::Deployment
+    DependsOn:
+      - AuthLoginMethod
+      - AuthRegisterMethod
+      - AuthRefreshMethod
+      - StudentProfileGetMethod
+      - StudentModulesGetMethod
+      - StudentFilesGetMethod
+      - EducatorProfileGetMethod
+      - EducatorModulesGetMethod
+      - EducatorFilesGetMethod
+      - EducatorFilesPostMethod
+      - AdminDepartmentsGetMethod
+      - AdminDepartmentsPostMethod
+      - AdminFacultiesGetMethod
+      - AdminFacultiesPostMethod
+      - AdminCampusesGetMethod
+      - AdminCampusesPostMethod
+      - AdminCoursesGetMethod
+      - AdminCoursesPostMethod
+      - AdminModulesGetMethod
+      - AdminModulesPostMethod
+      - AdminLecturersGetMethod
+      - AdminLecturersPostMethod
+      - AdminStudentsGetMethod
+      - AdminStudentsPostMethod
+      - AdminFilesGetMethod
+      - AdminFilesPostMethod
+      - AiChatGetMethod
+      - AiChatPostMethod
+      - AiQuizGetMethod
+      - AiQuizPostMethod
+      - AiSummaryGetMethod
+      - AiSummaryPostMethod
+    Properties:
+      RestApiId: !Ref TutorVerseApi
+      StageName: !Ref EnvironmentName
+
+  # ==================== LAMBDA PERMISSIONS ====================
+  AuthLoginPermission:
+    Type: AWS::Lambda::Permission
+    Properties:
+      FunctionName: !Ref AuthLoginFunction
+      Action: lambda:InvokeFunction
+      Principal: apigateway.amazonaws.com
+      SourceArn: !Sub 'arn:aws:execute-api:${AWS::Region}:${AWS::AccountId}:${TutorVerseApi}/*/*'
+
+  AuthRegisterPermission:
+    Type: AWS::Lambda::Permission
+    Properties:
+      FunctionName: !Ref AuthRegisterFunction
+      Action: lambda:InvokeFunction
+      Principal: apigateway.amazonaws.com
+      SourceArn: !Sub 'arn:aws:execute-api:${AWS::Region}:${AWS::AccountId}:${TutorVerseApi}/*/*'
+
+  AuthRefreshPermission:
+    Type: AWS::Lambda::Permission
+    Properties:
+      FunctionName: !Ref AuthRefreshFunction
+      Action: lambda:InvokeFunction
+      Principal: apigateway.amazonaws.com
+      SourceArn: !Sub 'arn:aws:execute-api:${AWS::Region}:${AWS::AccountId}:${TutorVerseApi}/*/*'
+
+  AuthActivationPermission:
+    Type: AWS::Lambda::Permission
+    Properties:
+      FunctionName: !Ref AuthActivationFunction
+      Action: lambda:InvokeFunction
+      Principal: apigateway.amazonaws.com
+      SourceArn: !Sub 'arn:aws:execute-api:${AWS::Region}:${AWS::AccountId}:${TutorVerseApi}/*/*'
+
+  StudentProfilePermission:
+    Type: AWS::Lambda::Permission
+    Properties:
+      FunctionName: !Ref StudentProfileFunction
+      Action: lambda:InvokeFunction
+      Principal: apigateway.amazonaws.com
+      SourceArn: !Sub 'arn:aws:execute-api:${AWS::Region}:${AWS::AccountId}:${TutorVerseApi}/*/*'
+
+  StudentHandlerPermission:
+    Type: AWS::Lambda::Permission
+    Properties:
+      FunctionName: !Ref StudentHandlerFunction
+      Action: lambda:InvokeFunction
+      Principal: apigateway.amazonaws.com
+      SourceArn: !Sub 'arn:aws:execute-api:${AWS::Region}:${AWS::AccountId}:${TutorVerseApi}/*/*'
+
+  StudentFilesPermission:
+    Type: AWS::Lambda::Permission
+    Properties:
+      FunctionName: !Ref StudentFilesFunction
+      Action: lambda:InvokeFunction
+      Principal: apigateway.amazonaws.com
+      SourceArn: !Sub 'arn:aws:execute-api:${AWS::Region}:${AWS::AccountId}:${TutorVerseApi}/*/*'
+
+  EducatorHandlerPermission:
+    Type: AWS::Lambda::Permission
+    Properties:
+      FunctionName: !Ref EducatorHandlerFunction
+      Action: lambda:InvokeFunction
+      Principal: apigateway.amazonaws.com
+      SourceArn: !Sub 'arn:aws:execute-api:${AWS::Region}:${AWS::AccountId}:${TutorVerseApi}/*/*'
+
+  EducatorFilesPermission:
+    Type: AWS::Lambda::Permission
+    Properties:
+      FunctionName: !Ref EducatorFilesFunction
+      Action: lambda:InvokeFunction
+      Principal: apigateway.amazonaws.com
+      SourceArn: !Sub 'arn:aws:execute-api:${AWS::Region}:${AWS::AccountId}:${TutorVerseApi}/*/*'
+
+  EducatorPortalFilesPermission:
+    Type: AWS::Lambda::Permission
+    Properties:
+      FunctionName: !Ref EducatorPortalFilesFunction
+      Action: lambda:InvokeFunction
+      Principal: apigateway.amazonaws.com
+      SourceArn: !Sub 'arn:aws:execute-api:${AWS::Region}:${AWS::AccountId}:${TutorVerseApi}/*/*'
+
+  AdminDepartmentsPermission:
+    Type: AWS::Lambda::Permission
+    Properties:
+      FunctionName: !Ref AdminDepartmentsFunction
+      Action: lambda:InvokeFunction
+      Principal: apigateway.amazonaws.com
+      SourceArn: !Sub 'arn:aws:execute-api:${AWS::Region}:${AWS::AccountId}:${TutorVerseApi}/*/*'
+
+  AdminFacultiesPermission:
+    Type: AWS::Lambda::Permission
+    Properties:
+      FunctionName: !Ref AdminFacultiesFunction
+      Action: lambda:InvokeFunction
+      Principal: apigateway.amazonaws.com
+      SourceArn: !Sub 'arn:aws:execute-api:${AWS::Region}:${AWS::AccountId}:${TutorVerseApi}/*/*'
+
+  AdminCampusesPermission:
+    Type: AWS::Lambda::Permission
+    Properties:
+      FunctionName: !Ref AdminCampusesFunction
+      Action: lambda:InvokeFunction
+      Principal: apigateway.amazonaws.com
+      SourceArn: !Sub 'arn:aws:execute-api:${AWS::Region}:${AWS::AccountId}:${TutorVerseApi}/*/*'
+
+  AdminCoursesPermission:
+    Type: AWS::Lambda::Permission
+    Properties:
+      FunctionName: !Ref AdminCoursesFunction
+      Action: lambda:InvokeFunction
+      Principal: apigateway.amazonaws.com
+      SourceArn: !Sub 'arn:aws:execute-api:${AWS::Region}:${AWS::AccountId}:${TutorVerseApi}/*/*'
+
+  AdminModulesPermission:
+    Type: AWS::Lambda::Permission
+    Properties:
+      FunctionName: !Ref AdminModulesFunction
+      Action: lambda:InvokeFunction
+      Principal: apigateway.amazonaws.com
+      SourceArn: !Sub 'arn:aws:execute-api:${AWS::Region}:${AWS::AccountId}:${TutorVerseApi}/*/*'
+
+  AdminLecturersPermission:
+    Type: AWS::Lambda::Permission
+    Properties:
+      FunctionName: !Ref AdminLecturersFunction
+      Action: lambda:InvokeFunction
+      Principal: apigateway.amazonaws.com
+      SourceArn: !Sub 'arn:aws:execute-api:${AWS::Region}:${AWS::AccountId}:${TutorVerseApi}/*/*'
+
+  AdminStudentsPermission:
+    Type: AWS::Lambda::Permission
+    Properties:
+      FunctionName: !Ref AdminStudentsFunction
+      Action: lambda:InvokeFunction
+      Principal: apigateway.amazonaws.com
+      SourceArn: !Sub 'arn:aws:execute-api:${AWS::Region}:${AWS::AccountId}:${TutorVerseApi}/*/*'
+
+  AdminFilesPermission:
+    Type: AWS::Lambda::Permission
+    Properties:
+      FunctionName: !Ref AdminFilesFunction
+      Action: lambda:InvokeFunction
+      Principal: apigateway.amazonaws.com
+      SourceArn: !Sub 'arn:aws:execute-api:${AWS::Region}:${AWS::AccountId}:${TutorVerseApi}/*/*'
+
+  AIChatPermission:
+    Type: AWS::Lambda::Permission
+    Properties:
+      FunctionName: !Ref AIChatFunction
+      Action: lambda:InvokeFunction
+      Principal: apigateway.amazonaws.com
+      SourceArn: !Sub 'arn:aws:execute-api:${AWS::Region}:${AWS::AccountId}:${TutorVerseApi}/*/*'
+
+  AIQuizPermission:
+    Type: AWS::Lambda::Permission
+    Properties:
+      FunctionName: !Ref AIQuizFunction
+      Action: lambda:InvokeFunction
+      Principal: apigateway.amazonaws.com
+      SourceArn: !Sub 'arn:aws:execute-api:${AWS::Region}:${AWS::AccountId}:${TutorVerseApi}/*/*'
+
+  AISummaryPermission:
+    Type: AWS::Lambda::Permission
+    Properties:
+      FunctionName: !Ref AISummaryFunction
+      Action: lambda:InvokeFunction
+      Principal: apigateway.amazonaws.com
+      SourceArn: !Sub 'arn:aws:execute-api:${AWS::Region}:${AWS::AccountId}:${TutorVerseApi}/*/*'
+
+Outputs:
+  UserPoolId:
+    Description: Cognito User Pool ID
+    Value: !Ref TutorVerseUserPool
+    Export:
+      Name: !Sub '${EnvironmentName}-UserPoolId'
+
+  UserPoolArn:
+    Description: Cognito User Pool ARN
+    Value: !GetAtt TutorVerseUserPool.Arn
+    Export:
+      Name: !Sub '${EnvironmentName}-UserPoolArn'
+
+  UserPoolClientId:
+    Description: Cognito User Pool Client ID
+    Value: !Ref TutorVerseUserPoolClient
+    Export:
+      Name: !Sub '${EnvironmentName}-UserPoolClientId'
+
+  CourseFilesBucketName:
+    Description: S3 Bucket for Course Files
+    Value: !Ref CourseFilesBucket
+    Export:
+      Name: !Sub '${EnvironmentName}-CourseFilesBucket'
+
+  LogsBucketName:
+    Description: S3 Bucket for Logs
+    Value: !Ref LogsBucket
+    Export:
+      Name: !Sub '${EnvironmentName}-LogsBucket'
+
+  ApiEndpoint:
+    Description: API Gateway Endpoint URL
+    Value: !Sub 'https://${TutorVerseApi}.execute-api.${AWS::Region}.amazonaws.com/${EnvironmentName}'
+    Export:
+      Name: !Sub '${EnvironmentName}-ApiEndpoint'
+
+  ApiId:
+    Description: API Gateway REST API ID
+    Value: !Ref TutorVerseApi
+    Export:
+      Name: !Sub '${EnvironmentName}-ApiId'
+
+  LambdaExecutionRoleArn:
+    Description: Lambda Execution Role ARN
+    Value: !GetAtt LambdaExecutionRole.Arn
+    Export:
+      Name: !Sub '${EnvironmentName}-LambdaRoleArn'

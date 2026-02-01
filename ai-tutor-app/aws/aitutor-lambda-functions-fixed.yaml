@@ -1,0 +1,584 @@
+AWSTemplateFormatVersion: '2010-09-09'
+Description: |
+  TutorVerse - Lambda Functions Deployment
+  
+  Creates 21 Lambda functions with their own IAM role.
+  Does NOT require infrastructure stack to exist.
+  Safe to deploy independently.
+
+Parameters:
+  EnvironmentName:
+    Type: String
+    Default: production
+    AllowedValues:
+      - development
+      - staging
+      - production
+    Description: Deployment environment
+
+  LambdaCodeBucket:
+    Type: String
+    Default: tutorverse-infrastructure
+    Description: S3 bucket containing compiled Lambda code
+
+  LambdaCodeZipKey:
+    Type: String
+    Default: lambda-code.zip
+    Description: S3 key for Lambda function code ZIP
+
+  ApiGatewayId:
+    Type: String
+    Description: API Gateway ID from infrastructure stack (e.g., 4pf36kknz8)
+    Default: 4pf36kknz8
+
+Metadata:
+  AWS::CloudFormation::Interface:
+    ParameterGroups:
+      - Label:
+          default: Environment Configuration
+        Parameters:
+          - EnvironmentName
+      - Label:
+          default: Lambda Code Location
+        Parameters:
+          - LambdaCodeBucket
+          - LambdaCodeZipKey
+      - Label:
+          default: API Gateway Integration
+        Parameters:
+          - ApiGatewayId
+
+Resources:
+  # ==================== IAM ROLE FOR LAMBDA ====================
+  LambdaExecutionRole:
+    Type: AWS::IAM::Role
+    Properties:
+      RoleName: !Sub 'tutorverse-lambda-${EnvironmentName}'
+      AssumeRolePolicyDocument:
+        Version: '2012-10-17'
+        Statement:
+          - Effect: Allow
+            Principal:
+              Service: lambda.amazonaws.com
+            Action: sts:AssumeRole
+      ManagedPolicyArns:
+        - arn:aws:iam::aws:policy/service-role/AWSLambdaBasicExecutionRole
+      Policies:
+        - PolicyName: DynamoDBAccess
+          PolicyDocument:
+            Version: '2012-10-17'
+            Statement:
+              - Effect: Allow
+                Action:
+                  - dynamodb:GetItem
+                  - dynamodb:PutItem
+                  - dynamodb:UpdateItem
+                  - dynamodb:DeleteItem
+                  - dynamodb:Query
+                  - dynamodb:Scan
+                  - dynamodb:BatchGetItem
+                  - dynamodb:BatchWriteItem
+                Resource: !Sub 'arn:aws:dynamodb:${AWS::Region}:${AWS::AccountId}:table/aitutor_*'
+        - PolicyName: S3Access
+          PolicyDocument:
+            Version: '2012-10-17'
+            Statement:
+              - Effect: Allow
+                Action:
+                  - s3:GetObject
+                  - s3:PutObject
+                  - s3:DeleteObject
+                  - s3:ListBucket
+                Resource:
+                  - !Sub 'arn:aws:s3:::aitutor-files-${EnvironmentName}-${AWS::AccountId}/*'
+                  - !Sub 'arn:aws:s3:::aitutor-files-${EnvironmentName}-${AWS::AccountId}'
+                  - !Sub 'arn:aws:s3:::aitutor-logs-${EnvironmentName}-${AWS::AccountId}/*'
+                  - !Sub 'arn:aws:s3:::aitutor-logs-${EnvironmentName}-${AWS::AccountId}'
+
+  # ==================== LAMBDA FUNCTIONS (21 total) ====================
+
+  # AUTH FUNCTIONS (4)
+  AuthLoginFunction:
+    Type: AWS::Lambda::Function
+    Properties:
+      FunctionName: !Sub 'tutorverse-auth-login-${EnvironmentName}'
+      Runtime: nodejs18.x
+      Handler: dist/lambda/auth/login.handleLogin
+      Role: !GetAtt LambdaExecutionRole.Arn
+      Code:
+        S3Bucket: !Ref LambdaCodeBucket
+        S3Key: !Ref LambdaCodeZipKey
+      Timeout: 30
+      MemorySize: 256
+
+  AuthRegisterFunction:
+    Type: AWS::Lambda::Function
+    Properties:
+      FunctionName: !Sub 'tutorverse-auth-register-${EnvironmentName}'
+      Runtime: nodejs18.x
+      Handler: dist/lambda/auth/register.handleRegister
+      Role: !GetAtt LambdaExecutionRole.Arn
+      Code:
+        S3Bucket: !Ref LambdaCodeBucket
+        S3Key: !Ref LambdaCodeZipKey
+      Timeout: 30
+      MemorySize: 256
+
+  AuthRefreshFunction:
+    Type: AWS::Lambda::Function
+    Properties:
+      FunctionName: !Sub 'tutorverse-auth-refresh-${EnvironmentName}'
+      Runtime: nodejs18.x
+      Handler: dist/lambda/auth/refresh.handleRefresh
+      Role: !GetAtt LambdaExecutionRole.Arn
+      Code:
+        S3Bucket: !Ref LambdaCodeBucket
+        S3Key: !Ref LambdaCodeZipKey
+      Timeout: 30
+      MemorySize: 256
+
+  AuthActivationFunction:
+    Type: AWS::Lambda::Function
+    Properties:
+      FunctionName: !Sub 'tutorverse-auth-activation-${EnvironmentName}'
+      Runtime: nodejs18.x
+      Handler: dist/lambda/auth/register-activation.handleRegisterActivation
+      Role: !GetAtt LambdaExecutionRole.Arn
+      Code:
+        S3Bucket: !Ref LambdaCodeBucket
+        S3Key: !Ref LambdaCodeZipKey
+      Timeout: 30
+      MemorySize: 256
+
+  # STUDENT FUNCTIONS (3)
+  StudentProfileFunction:
+    Type: AWS::Lambda::Function
+    Properties:
+      FunctionName: !Sub 'tutorverse-student-profile-${EnvironmentName}'
+      Runtime: nodejs18.x
+      Handler: dist/lambda/student/profile.handleGetStudentProfile
+      Role: !GetAtt LambdaExecutionRole.Arn
+      Code:
+        S3Bucket: !Ref LambdaCodeBucket
+        S3Key: !Ref LambdaCodeZipKey
+      Timeout: 30
+      MemorySize: 256
+
+  StudentModulesFunction:
+    Type: AWS::Lambda::Function
+    Properties:
+      FunctionName: !Sub 'tutorverse-student-modules-${EnvironmentName}'
+      Runtime: nodejs18.x
+      Handler: dist/lambda/student/modules.handleListEnrolledModules
+      Role: !GetAtt LambdaExecutionRole.Arn
+      Code:
+        S3Bucket: !Ref LambdaCodeBucket
+        S3Key: !Ref LambdaCodeZipKey
+      Timeout: 30
+      MemorySize: 256
+
+  StudentFilesFunction:
+    Type: AWS::Lambda::Function
+    Properties:
+      FunctionName: !Sub 'tutorverse-student-files-${EnvironmentName}'
+      Runtime: nodejs18.x
+      Handler: dist/lambda/student/files.handleGetModuleContent
+      Role: !GetAtt LambdaExecutionRole.Arn
+      Code:
+        S3Bucket: !Ref LambdaCodeBucket
+        S3Key: !Ref LambdaCodeZipKey
+      Timeout: 30
+      MemorySize: 256
+
+  # EDUCATOR FUNCTIONS (3)
+  EducatorProfileFunction:
+    Type: AWS::Lambda::Function
+    Properties:
+      FunctionName: !Sub 'tutorverse-educator-profile-${EnvironmentName}'
+      Runtime: nodejs18.x
+      Handler: dist/lambda/educator/profile.handleGetEducatorProfile
+      Role: !GetAtt LambdaExecutionRole.Arn
+      Code:
+        S3Bucket: !Ref LambdaCodeBucket
+        S3Key: !Ref LambdaCodeZipKey
+      Timeout: 30
+      MemorySize: 256
+
+  EducatorModulesFunction:
+    Type: AWS::Lambda::Function
+    Properties:
+      FunctionName: !Sub 'tutorverse-educator-modules-${EnvironmentName}'
+      Runtime: nodejs18.x
+      Handler: dist/lambda/educator/modules.handleListModules
+      Role: !GetAtt LambdaExecutionRole.Arn
+      Code:
+        S3Bucket: !Ref LambdaCodeBucket
+        S3Key: !Ref LambdaCodeZipKey
+      Timeout: 30
+      MemorySize: 256
+
+  EducatorFilesFunction:
+    Type: AWS::Lambda::Function
+    Properties:
+      FunctionName: !Sub 'tutorverse-educator-files-${EnvironmentName}'
+      Runtime: nodejs18.x
+      Handler: dist/lambda/educator/files.handleListMyFiles
+      Role: !GetAtt LambdaExecutionRole.Arn
+      Code:
+        S3Bucket: !Ref LambdaCodeBucket
+        S3Key: !Ref LambdaCodeZipKey
+      Timeout: 30
+      MemorySize: 256
+
+  # ADMIN FUNCTIONS (8)
+  AdminLecturersFunction:
+    Type: AWS::Lambda::Function
+    Properties:
+      FunctionName: !Sub 'tutorverse-admin-lecturers-${EnvironmentName}'
+      Runtime: nodejs18.x
+      Handler: dist/lambda/admin/lecturers.handleListLecturers
+      Role: !GetAtt LambdaExecutionRole.Arn
+      Code:
+        S3Bucket: !Ref LambdaCodeBucket
+        S3Key: !Ref LambdaCodeZipKey
+      Timeout: 30
+      MemorySize: 256
+
+  AdminStudentsFunction:
+    Type: AWS::Lambda::Function
+    Properties:
+      FunctionName: !Sub 'tutorverse-admin-students-${EnvironmentName}'
+      Runtime: nodejs18.x
+      Handler: dist/lambda/admin/students.handleListStudents
+      Role: !GetAtt LambdaExecutionRole.Arn
+      Code:
+        S3Bucket: !Ref LambdaCodeBucket
+        S3Key: !Ref LambdaCodeZipKey
+      Timeout: 30
+      MemorySize: 256
+
+  AdminModulesFunction:
+    Type: AWS::Lambda::Function
+    Properties:
+      FunctionName: !Sub 'tutorverse-admin-modules-${EnvironmentName}'
+      Runtime: nodejs18.x
+      Handler: dist/lambda/admin/modules.handleListModules
+      Role: !GetAtt LambdaExecutionRole.Arn
+      Code:
+        S3Bucket: !Ref LambdaCodeBucket
+        S3Key: !Ref LambdaCodeZipKey
+      Timeout: 30
+      MemorySize: 256
+
+  AdminDepartmentsFunction:
+    Type: AWS::Lambda::Function
+    Properties:
+      FunctionName: !Sub 'tutorverse-admin-departments-${EnvironmentName}'
+      Runtime: nodejs18.x
+      Handler: dist/lambda/admin/departments.handleListDepartments
+      Role: !GetAtt LambdaExecutionRole.Arn
+      Code:
+        S3Bucket: !Ref LambdaCodeBucket
+        S3Key: !Ref LambdaCodeZipKey
+      Timeout: 30
+      MemorySize: 256
+
+  AdminFacultiesFunction:
+    Type: AWS::Lambda::Function
+    Properties:
+      FunctionName: !Sub 'tutorverse-admin-faculties-${EnvironmentName}'
+      Runtime: nodejs18.x
+      Handler: dist/lambda/admin/faculties.handleListFaculties
+      Role: !GetAtt LambdaExecutionRole.Arn
+      Code:
+        S3Bucket: !Ref LambdaCodeBucket
+        S3Key: !Ref LambdaCodeZipKey
+      Timeout: 30
+      MemorySize: 256
+
+  AdminCoursesFunction:
+    Type: AWS::Lambda::Function
+    Properties:
+      FunctionName: !Sub 'tutorverse-admin-courses-${EnvironmentName}'
+      Runtime: nodejs18.x
+      Handler: dist/lambda/admin/courses.handleListCourses
+      Role: !GetAtt LambdaExecutionRole.Arn
+      Code:
+        S3Bucket: !Ref LambdaCodeBucket
+        S3Key: !Ref LambdaCodeZipKey
+      Timeout: 30
+      MemorySize: 256
+
+  AdminCampusesFunction:
+    Type: AWS::Lambda::Function
+    Properties:
+      FunctionName: !Sub 'tutorverse-admin-campuses-${EnvironmentName}'
+      Runtime: nodejs18.x
+      Handler: dist/lambda/admin/campuses.handleListCampuses
+      Role: !GetAtt LambdaExecutionRole.Arn
+      Code:
+        S3Bucket: !Ref LambdaCodeBucket
+        S3Key: !Ref LambdaCodeZipKey
+      Timeout: 30
+      MemorySize: 256
+
+  AdminFilesFunction:
+    Type: AWS::Lambda::Function
+    Properties:
+      FunctionName: !Sub 'tutorverse-admin-files-${EnvironmentName}'
+      Runtime: nodejs18.x
+      Handler: dist/lambda/admin/files.handleListFiles
+      Role: !GetAtt LambdaExecutionRole.Arn
+      Code:
+        S3Bucket: !Ref LambdaCodeBucket
+        S3Key: !Ref LambdaCodeZipKey
+      Timeout: 30
+      MemorySize: 256
+
+  # AI FUNCTIONS (3)
+  AIChatFunction:
+    Type: AWS::Lambda::Function
+    Properties:
+      FunctionName: !Sub 'tutorverse-ai-chat-${EnvironmentName}'
+      Runtime: nodejs18.x
+      Handler: dist/lambda/ai/chat.handleCreateSession
+      Role: !GetAtt LambdaExecutionRole.Arn
+      Code:
+        S3Bucket: !Ref LambdaCodeBucket
+        S3Key: !Ref LambdaCodeZipKey
+      Timeout: 60
+      MemorySize: 512
+
+  AIQuizFunction:
+    Type: AWS::Lambda::Function
+    Properties:
+      FunctionName: !Sub 'tutorverse-ai-quiz-${EnvironmentName}'
+      Runtime: nodejs18.x
+      Handler: dist/lambda/ai/quiz.handleGenerateQuiz
+      Role: !GetAtt LambdaExecutionRole.Arn
+      Code:
+        S3Bucket: !Ref LambdaCodeBucket
+        S3Key: !Ref LambdaCodeZipKey
+      Timeout: 60
+      MemorySize: 512
+
+  AISummaryFunction:
+    Type: AWS::Lambda::Function
+    Properties:
+      FunctionName: !Sub 'tutorverse-ai-summary-${EnvironmentName}'
+      Runtime: nodejs18.x
+      Handler: dist/lambda/ai/summary.handleGenerateSummary
+      Role: !GetAtt LambdaExecutionRole.Arn
+      Code:
+        S3Bucket: !Ref LambdaCodeBucket
+        S3Key: !Ref LambdaCodeZipKey
+      Timeout: 60
+      MemorySize: 512
+
+  # ==================== LAMBDA PERMISSIONS (21 total) ====================
+
+  AuthLoginPermission:
+    Type: AWS::Lambda::Permission
+    Properties:
+      FunctionName: !Ref AuthLoginFunction
+      Action: lambda:InvokeFunction
+      Principal: apigateway.amazonaws.com
+      SourceArn: !Sub 'arn:aws:execute-api:${AWS::Region}:${AWS::AccountId}:${ApiGatewayId}/*/*'
+
+  AuthRegisterPermission:
+    Type: AWS::Lambda::Permission
+    Properties:
+      FunctionName: !Ref AuthRegisterFunction
+      Action: lambda:InvokeFunction
+      Principal: apigateway.amazonaws.com
+      SourceArn: !Sub 'arn:aws:execute-api:${AWS::Region}:${AWS::AccountId}:${ApiGatewayId}/*/*'
+
+  AuthRefreshPermission:
+    Type: AWS::Lambda::Permission
+    Properties:
+      FunctionName: !Ref AuthRefreshFunction
+      Action: lambda:InvokeFunction
+      Principal: apigateway.amazonaws.com
+      SourceArn: !Sub 'arn:aws:execute-api:${AWS::Region}:${AWS::AccountId}:${ApiGatewayId}/*/*'
+
+  AuthActivationPermission:
+    Type: AWS::Lambda::Permission
+    Properties:
+      FunctionName: !Ref AuthActivationFunction
+      Action: lambda:InvokeFunction
+      Principal: apigateway.amazonaws.com
+      SourceArn: !Sub 'arn:aws:execute-api:${AWS::Region}:${AWS::AccountId}:${ApiGatewayId}/*/*'
+
+  StudentProfilePermission:
+    Type: AWS::Lambda::Permission
+    Properties:
+      FunctionName: !Ref StudentProfileFunction
+      Action: lambda:InvokeFunction
+      Principal: apigateway.amazonaws.com
+      SourceArn: !Sub 'arn:aws:execute-api:${AWS::Region}:${AWS::AccountId}:${ApiGatewayId}/*/*'
+
+  StudentModulesPermission:
+    Type: AWS::Lambda::Permission
+    Properties:
+      FunctionName: !Ref StudentModulesFunction
+      Action: lambda:InvokeFunction
+      Principal: apigateway.amazonaws.com
+      SourceArn: !Sub 'arn:aws:execute-api:${AWS::Region}:${AWS::AccountId}:${ApiGatewayId}/*/*'
+
+  StudentFilesPermission:
+    Type: AWS::Lambda::Permission
+    Properties:
+      FunctionName: !Ref StudentFilesFunction
+      Action: lambda:InvokeFunction
+      Principal: apigateway.amazonaws.com
+      SourceArn: !Sub 'arn:aws:execute-api:${AWS::Region}:${AWS::AccountId}:${ApiGatewayId}/*/*'
+
+  EducatorProfilePermission:
+    Type: AWS::Lambda::Permission
+    Properties:
+      FunctionName: !Ref EducatorProfileFunction
+      Action: lambda:InvokeFunction
+      Principal: apigateway.amazonaws.com
+      SourceArn: !Sub 'arn:aws:execute-api:${AWS::Region}:${AWS::AccountId}:${ApiGatewayId}/*/*'
+
+  EducatorModulesPermission:
+    Type: AWS::Lambda::Permission
+    Properties:
+      FunctionName: !Ref EducatorModulesFunction
+      Action: lambda:InvokeFunction
+      Principal: apigateway.amazonaws.com
+      SourceArn: !Sub 'arn:aws:execute-api:${AWS::Region}:${AWS::AccountId}:${ApiGatewayId}/*/*'
+
+  EducatorFilesPermission:
+    Type: AWS::Lambda::Permission
+    Properties:
+      FunctionName: !Ref EducatorFilesFunction
+      Action: lambda:InvokeFunction
+      Principal: apigateway.amazonaws.com
+      SourceArn: !Sub 'arn:aws:execute-api:${AWS::Region}:${AWS::AccountId}:${ApiGatewayId}/*/*'
+
+  AdminLecturersPermission:
+    Type: AWS::Lambda::Permission
+    Properties:
+      FunctionName: !Ref AdminLecturersFunction
+      Action: lambda:InvokeFunction
+      Principal: apigateway.amazonaws.com
+      SourceArn: !Sub 'arn:aws:execute-api:${AWS::Region}:${AWS::AccountId}:${ApiGatewayId}/*/*'
+
+  AdminStudentsPermission:
+    Type: AWS::Lambda::Permission
+    Properties:
+      FunctionName: !Ref AdminStudentsFunction
+      Action: lambda:InvokeFunction
+      Principal: apigateway.amazonaws.com
+      SourceArn: !Sub 'arn:aws:execute-api:${AWS::Region}:${AWS::AccountId}:${ApiGatewayId}/*/*'
+
+  AdminModulesPermission:
+    Type: AWS::Lambda::Permission
+    Properties:
+      FunctionName: !Ref AdminModulesFunction
+      Action: lambda:InvokeFunction
+      Principal: apigateway.amazonaws.com
+      SourceArn: !Sub 'arn:aws:execute-api:${AWS::Region}:${AWS::AccountId}:${ApiGatewayId}/*/*'
+
+  AdminDepartmentsPermission:
+    Type: AWS::Lambda::Permission
+    Properties:
+      FunctionName: !Ref AdminDepartmentsFunction
+      Action: lambda:InvokeFunction
+      Principal: apigateway.amazonaws.com
+      SourceArn: !Sub 'arn:aws:execute-api:${AWS::Region}:${AWS::AccountId}:${ApiGatewayId}/*/*'
+
+  AdminFacultiesPermission:
+    Type: AWS::Lambda::Permission
+    Properties:
+      FunctionName: !Ref AdminFacultiesFunction
+      Action: lambda:InvokeFunction
+      Principal: apigateway.amazonaws.com
+      SourceArn: !Sub 'arn:aws:execute-api:${AWS::Region}:${AWS::AccountId}:${ApiGatewayId}/*/*'
+
+  AdminCoursesPermission:
+    Type: AWS::Lambda::Permission
+    Properties:
+      FunctionName: !Ref AdminCoursesFunction
+      Action: lambda:InvokeFunction
+      Principal: apigateway.amazonaws.com
+      SourceArn: !Sub 'arn:aws:execute-api:${AWS::Region}:${AWS::AccountId}:${ApiGatewayId}/*/*'
+
+  AdminCampusesPermission:
+    Type: AWS::Lambda::Permission
+    Properties:
+      FunctionName: !Ref AdminCampusesFunction
+      Action: lambda:InvokeFunction
+      Principal: apigateway.amazonaws.com
+      SourceArn: !Sub 'arn:aws:execute-api:${AWS::Region}:${AWS::AccountId}:${ApiGatewayId}/*/*'
+
+  AdminFilesPermission:
+    Type: AWS::Lambda::Permission
+    Properties:
+      FunctionName: !Ref AdminFilesFunction
+      Action: lambda:InvokeFunction
+      Principal: apigateway.amazonaws.com
+      SourceArn: !Sub 'arn:aws:execute-api:${AWS::Region}:${AWS::AccountId}:${ApiGatewayId}/*/*'
+
+  AIChatPermission:
+    Type: AWS::Lambda::Permission
+    Properties:
+      FunctionName: !Ref AIChatFunction
+      Action: lambda:InvokeFunction
+      Principal: apigateway.amazonaws.com
+      SourceArn: !Sub 'arn:aws:execute-api:${AWS::Region}:${AWS::AccountId}:${ApiGatewayId}/*/*'
+
+  AIQuizPermission:
+    Type: AWS::Lambda::Permission
+    Properties:
+      FunctionName: !Ref AIQuizFunction
+      Action: lambda:InvokeFunction
+      Principal: apigateway.amazonaws.com
+      SourceArn: !Sub 'arn:aws:execute-api:${AWS::Region}:${AWS::AccountId}:${ApiGatewayId}/*/*'
+
+  AISummaryPermission:
+    Type: AWS::Lambda::Permission
+    Properties:
+      FunctionName: !Ref AISummaryFunction
+      Action: lambda:InvokeFunction
+      Principal: apigateway.amazonaws.com
+      SourceArn: !Sub 'arn:aws:execute-api:${AWS::Region}:${AWS::AccountId}:${ApiGatewayId}/*/*'
+
+Outputs:
+  LambdaRoleArn:
+    Description: Lambda Execution Role ARN
+    Value: !GetAtt LambdaExecutionRole.Arn
+    Export:
+      Name: !Sub 'tutorverse-lambda-role-${EnvironmentName}'
+
+  AuthLoginFunctionArn:
+    Description: Auth Login Function ARN
+    Value: !GetAtt AuthLoginFunction.Arn
+
+  StudentProfileFunctionArn:
+    Description: Student Profile Function ARN
+    Value: !GetAtt StudentProfileFunction.Arn
+
+  EducatorProfileFunctionArn:
+    Description: Educator Profile Function ARN
+    Value: !GetAtt EducatorProfileFunction.Arn
+
+  AdminLecturersFunctionArn:
+    Description: Admin Lecturers Function ARN
+    Value: !GetAtt AdminLecturersFunction.Arn
+
+  AIChatFunctionArn:
+    Description: AI Chat Function ARN
+    Value: !GetAtt AIChatFunction.Arn
+
+  ApiEndpoint:
+    Description: API Gateway Endpoint URL
+    Value: !Sub 'https://${ApiGatewayId}.execute-api.${AWS::Region}.amazonaws.com/${EnvironmentName}'
+
+  DeploymentNote:
+    Description: Important Notes
+    Value: |
+      This stack defines 21 Lambda functions with their own IAM role.
+      Lambda code must be uploaded to S3 before deployment.
+      Safe to deploy independently of infrastructure stack.

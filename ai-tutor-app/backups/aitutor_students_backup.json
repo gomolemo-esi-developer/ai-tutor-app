@@ -1,0 +1,34 @@
+[
+  {
+    "studentNumber": "S001",
+    "departmentId": "",
+    "studentId": "a7975f76-959d-474f-9400-6c1b1de95af6",
+    "lastName": "One",
+    "createdAt": "1768251417",
+    "email": "student1@student.university.edu",
+    "campusId": "",
+    "moduleIds": [],
+    "firstName": "Student",
+    "userId": "352e7715-cb19-4434-a932-e880b5c72b4a",
+    "updatedAt": "1768251417",
+    "id": "a7975f76-959d-474f-9400-6c1b1de95af6",
+    "registrationStatus": "pending_activation",
+    "academicYear": "2024-2025"
+  },
+  {
+    "studentNumber": "S002",
+    "departmentId": "",
+    "studentId": "b5c9aa4e-4411-44e3-892d-de07dab42a14",
+    "lastName": "Two",
+    "createdAt": "1768251420",
+    "email": "student2@student.university.edu",
+    "campusId": "",
+    "moduleIds": [],
+    "firstName": "Student",
+    "userId": "df736fcc-f878-4b7f-9cce-692406000b47",
+    "updatedAt": "1768251420",
+    "id": "b5c9aa4e-4411-44e3-892d-de07dab42a14",
+    "registrationStatus": "pending_activation",
+    "academicYear": "2024-2025"
+  }
+]

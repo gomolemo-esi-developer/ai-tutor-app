@@ -1,0 +1,78 @@
+# Git
+.git
+.gitignore
+
+# Node
+node_modules
+npm-debug.log
+yarn-error.log
+package-lock.json
+
+# Python
+__pycache__
+*.pyc
+*.pyo
+*.pyd
+.Python
+venv
+env
+.venv
+
+# Logs
+*.log
+logs/
+*.log
+
+# OS
+.DS_Store
+Thumbs.db
+.vscode
+.idea
+*.swp
+*.swo
+*~
+
+# Development
+.env
+.env.local
+.env.*.local
+
+# Build artifacts
+dist/
+build/
+*.egg-info/
+.next/
+out/
+
+# Data/DB (will be mounted as volumes)
+chroma_db/
+data/
+
+# Temporary
+tmp/
+temp/
+*.tmp
+
+# CI/CD
+.github/
+.gitlab-ci.yml
+azure-pipelines.yml
+
+# Documentation (optional - keep if needed)
+docs/
+README*
+*.md
+
+# Backups
+backups/
+*.bak
+
+# Archive files
+*.tar.gz
+*.zip
+*.rar
+
+# AWS
+aws/
+.aws/
+lambda-code.*

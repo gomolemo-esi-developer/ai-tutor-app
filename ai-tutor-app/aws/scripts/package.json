@@ -1,0 +1,19 @@
+{
+  "name": "tutorverse-phase1-scripts",
+  "version": "1.0.0",
+  "description": "TutorVerse Phase 1 seed data and user creation scripts",
+  "scripts": {
+    "seed-data": "node phase1b-seed-data.js --env development",
+    "create-users": "node phase1b-create-users.js --env development",
+    "upload-data": "node upload-sample-data.js --environment development",
+    "upload-data:staging": "node upload-sample-data.js --environment staging",
+    "upload-data:prod": "node upload-sample-data.js --environment production"
+  },
+  "dependencies": {
+    "aws-sdk": "^2.1430.0",
+    "uuid": "^9.0.0"
+  },
+  "engines": {
+    "node": ">=18.0.0"
+  }
+}

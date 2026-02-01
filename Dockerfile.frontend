@@ -1,0 +1,50 @@
+FROM node:20-alpine AS builder
+
+WORKDIR /app
+
+# Copy package files
+COPY ai-tutor-app/tutorverse-hub-main/package*.json ./
+COPY ai-tutor-app/tutorverse-hub-main/bun.lockb ./
+
+# Install dependencies
+RUN npm ci
+
+# Copy source code
+COPY ai-tutor-app/tutorverse-hub-main/src ./src
+COPY ai-tutor-app/tutorverse-hub-main/public ./public
+COPY ai-tutor-app/tutorverse-hub-main/index.html ./
+COPY ai-tutor-app/tutorverse-hub-main/vite.config.ts ./
+COPY ai-tutor-app/tutorverse-hub-main/tsconfig*.json ./
+COPY ai-tutor-app/tutorverse-hub-main/tailwind.config.ts ./
+COPY ai-tutor-app/tutorverse-hub-main/postcss.config.js ./
+COPY ai-tutor-app/tutorverse-hub-main/components.json ./
+COPY ai-tutor-app/tutorverse-hub-main/eslint.config.js ./
+
+# Build
+RUN npm run build
+
+# Production stage
+FROM node:20-alpine
+
+WORKDIR /app
+
+# Install serve to run the built app
+RUN npm install -g serve
+
+# Copy built app from builder
+COPY --from=builder /app/dist ./dist
+
+# Create non-root user
+RUN addgroup -g 1001 -S nodejs && \
+    adduser -S nodejs -u 1001
+USER nodejs
+
+# Expose port
+EXPOSE 3000
+
+# Health check
+HEALTHCHECK --interval=30s --timeout=10s --start-period=10s --retries=3 \
+  CMD node -e "require('http').get('http://localhost:3000', (r) => {if (r.statusCode !== 200) throw new Error(r.statusCode)})"
+
+# Start server
+CMD ["serve", "-s", "dist", "-l", "3000"]
