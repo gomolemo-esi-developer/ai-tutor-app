@@ -22,6 +22,10 @@ RUN mkdir -p /app/data /app/chroma_db
 
 # Create non-root user for security
 RUN groupadd -r python && useradd -r -g python python
+
+# Fix permissions so python user can write to volumes
+RUN chown -R python:python /app/data /app/chroma_db
+
 USER python
 
 # Set environment variables
