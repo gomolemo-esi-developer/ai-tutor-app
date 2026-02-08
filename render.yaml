@@ -26,32 +26,35 @@ services:
     #   sizeGB: 10
 
   # Backend Service (DEPLOY SECOND)
-  - type: web
-    name: tutorverse-backend
-    runtime: docker
-    region: oregon
-    dockerfilePath: ./Dockerfile.backend
-    autoDeploy: true
-    healthCheckPath: /health
-    healthCheckStartPeriod: 60
-    envVars:
-      - key: NODE_ENV
-        value: production
-      - key: AWS_REGION
-        value: us-east-2
-      - key: ENVIRONMENT
-        value: production
-      - key: RAG_SERVICE_URL
-        # IMPORTANT: Replace with actual RAG service URL after deployment
-        # Format: https://tutorverse-rag.onrender.com
-        value: https://tutorverse-rag.onrender.com
-        sync: false
-      - key: RAG_ENABLE
-        value: 'true'
-      - key: RAG_TIMEOUT
-        value: '30000'
-      - key: RAG_RETRY_ATTEMPTS
-        value: '3'
+   - type: web
+     name: tutorverse-backend
+     runtime: docker
+     region: oregon
+     dockerfilePath: ./Dockerfile.backend
+     autoDeploy: true
+     healthCheckPath: /health
+     healthCheckStartPeriod: 60
+     envVars:
+       - key: NODE_ENV
+         value: production
+       - key: AWS_REGION
+         value: us-east-2
+       - key: ENVIRONMENT
+         value: production
+       - key: FRONTEND_URL
+         value: https://ai-tutor-ocue.onrender.com
+         sync: false
+       - key: RAG_SERVICE_URL
+         # IMPORTANT: Replace with actual RAG service URL after deployment
+         # Format: https://tutorverse-rag.onrender.com
+         value: https://tutorverse-rag.onrender.com
+         sync: false
+       - key: RAG_ENABLE
+         value: 'true'
+       - key: RAG_TIMEOUT
+         value: '30000'
+       - key: RAG_RETRY_ATTEMPTS
+         value: '3'
 
   # Frontend Service (DEPLOY THIRD)
    - type: web
