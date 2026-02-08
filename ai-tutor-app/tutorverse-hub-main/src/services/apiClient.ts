@@ -262,10 +262,17 @@ export const createApiClient = (config: ApiClientConfig): ApiClient => {
  * Create global API client instance with config from environment
  */
 export const createGlobalApiClient = (): ApiClient => {
-  const baseURL =
-    import.meta.env.VITE_API_URL ||
-    import.meta.env.VITE_API_BASE_URL ||
-    (import.meta.env.DEV ? 'http://localhost:3000' : '');
+  let baseURL = import.meta.env.VITE_API_URL || import.meta.env.VITE_API_BASE_URL;
+  
+  // Production: default to external backend URL
+  if (!baseURL && !import.meta.env.DEV) {
+    baseURL = 'https://tutorverse-backend-kpls.onrender.com';
+  }
+  // Development: default to localhost
+  else if (!baseURL && import.meta.env.DEV) {
+    baseURL = 'http://localhost:3000';
+  }
+  
   const debug = import.meta.env.DEV;
 
   return createApiClient({
