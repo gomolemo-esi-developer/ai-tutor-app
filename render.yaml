@@ -66,7 +66,16 @@ services:
       - key: BACKEND_URL
         # IMPORTANT: Replace with actual Backend service URL after deployment
         # Format: https://tutorverse-backend.onrender.com
-        value: https://tutorverse-backend.onrender.com
+        value: https://tutorverse-backend-kpls.onrender.com
+        sync: false
+      - key: VITE_API_URL
+        value: https://tutorverse-backend-kpls.onrender.com
+        sync: false
+      - key: VITE_API_BASE_URL
+        value: https://tutorverse-backend-kpls.onrender.com/api
+        sync: false
+      - key: VITE_BACKEND_URL
+        value: https://tutorverse-backend-kpls.onrender.com
         sync: false
       - key: NODE_ENV
         value: production
