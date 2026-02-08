@@ -1,0 +1,54 @@
+[
+  {
+    "departmentId": "7ba9d575-5bf7-40a7-8759-99a86f035e0e",
+    "updatedAt": "1768251203",
+    "status": "active",
+    "courseId": "5acd222c-ac1d-413f-b682-768ee6542596",
+    "createdAt": "1768251203",
+    "credits": "120",
+    "description": "4-year degree program in Mechanical Engineering",
+    "id": "90ef0ac3-91ec-4991-a46e-9e56f4384a58",
+    "duration": "4",
+    "courseCode": "ME100",
+    "name": "Bachelor of Science in Mechanical Engineering"
+  },
+  {
+    "departmentId": "9de8a22b-1568-4b87-b2d5-4d596d60276e",
+    "updatedAt": "1768251203",
+    "status": "active",
+    "courseId": "a8d48747-5797-4311-b512-71b72a76d5e1",
+    "createdAt": "1768251203",
+    "credits": "120",
+    "description": "4-year degree program in Civil Engineering",
+    "id": "4a29317e-36b1-4b78-85f4-b2093271e3bf",
+    "duration": "4",
+    "courseCode": "CE100",
+    "name": "Bachelor of Science in Civil Engineering"
+  },
+  {
+    "departmentId": "cb0068a5-54ef-4471-8d91-f177c64c0409",
+    "updatedAt": "1768251203",
+    "status": "active",
+    "courseId": "9f51fd33-d19f-4bcc-895c-01cc4914acae",
+    "createdAt": "1768251203",
+    "credits": "120",
+    "description": "4-year degree program in Computer Science",
+    "id": "82275c36-808b-43e7-863c-4ed8ea359fc1",
+    "duration": "4",
+    "courseCode": "CS100",
+    "name": "Bachelor of Science in Computer Science"
+  },
+  {
+    "departmentId": "3754af4b-1d01-4823-96af-03c9964321bc",
+    "updatedAt": "1768251203",
+    "status": "active",
+    "courseId": "44d2e14c-6921-439c-8b48-a6c2ea3fdd4c",
+    "createdAt": "1768251203",
+    "credits": "120",
+    "description": "4-year degree program in Electrical Engineering",
+    "id": "ea20445d-b495-4cfe-b1a0-8802ee824deb",
+    "duration": "4",
+    "courseCode": "EE100",
+    "name": "Bachelor of Science in Electrical Engineering"
+  }
+]

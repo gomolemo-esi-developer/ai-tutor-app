@@ -1,0 +1,42 @@
+[
+  {
+    "ParameterKey": "EnvironmentName",
+    "ParameterValue": "production"
+  },
+  {
+    "ParameterKey": "RegionName",
+    "ParameterValue": "us-east-2"
+  },
+  {
+    "ParameterKey": "AccountId",
+    "ParameterValue": "975050334073"
+  },
+  {
+    "ParameterKey": "AdminEmail",
+    "ParameterValue": "admin@tutorverse.edu"
+  },
+  {
+    "ParameterKey": "FrontendUrl",
+    "ParameterValue": "http://localhost:5173"
+  },
+  {
+    "ParameterKey": "AuthFunctionArn",
+    "ParameterValue": "arn:aws:lambda:us-east-2:975050334073:function:tutorverse-auth-login-production"
+  },
+  {
+    "ParameterKey": "AdminFunctionArn",
+    "ParameterValue": "arn:aws:lambda:us-east-2:975050334073:function:tutorverse-admin-lecturers-production"
+  },
+  {
+    "ParameterKey": "EducatorFunctionArn",
+    "ParameterValue": "arn:aws:lambda:us-east-2:975050334073:function:tutorverse-educator-modules-production"
+  },
+  {
+    "ParameterKey": "StudentFunctionArn",
+    "ParameterValue": "arn:aws:lambda:us-east-2:975050334073:function:tutorverse-student-modules-production"
+  },
+  {
+    "ParameterKey": "AIChatFunctionArn",
+    "ParameterValue": "arn:aws:lambda:us-east-2:975050334073:function:tutorverse-ai-chat-production"
+  }
+]

@@ -1,0 +1,9 @@
+{
+  "rewrites": [
+    {
+      "source": "/api/**",
+      "destination": "http://backend:3000/api/**"
+    }
+  ],
+  "fallback": "/index.html"
+}

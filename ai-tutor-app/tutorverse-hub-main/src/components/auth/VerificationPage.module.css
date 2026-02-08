@@ -1,0 +1,226 @@
+/* VerificationPage Styles using centralized design tokens */
+
+.container {
+  min-height: 100vh;
+  background-color: #111827;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: var(--spacing-md);
+}
+
+.formWrapper {
+  max-width: 28rem;
+  width: 100%;
+  display: flex;
+  flex-direction: column;
+  gap: var(--spacing-xl);
+}
+
+.header {
+  text-align: center;
+}
+
+.backButton {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--spacing-sm);
+  margin-bottom: var(--spacing-lg);
+  color: #60a5fa;
+  text-decoration: none;
+  cursor: pointer;
+  font-family: var(--font-poppins);
+  transition: color var(--transition-normal);
+}
+
+.backButton:hover {
+  color: #93c5fd;
+}
+
+.backButtonIcon {
+  width: 1rem;
+  height: 1rem;
+}
+
+.iconContainer {
+  margin: 0 auto var(--spacing-lg);
+  width: 4rem;
+  height: 4rem;
+  background-color: #2563eb;
+  border-radius: var(--radius-full);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.iconCheck {
+  width: 2rem;
+  height: 2rem;
+  color: white;
+}
+
+.title {
+  font-size: var(--font-size-3xl);
+  font-weight: var(--font-weight-bold);
+  color: white;
+  margin-bottom: var(--spacing-sm);
+  font-family: var(--font-poppins);
+}
+
+.subtitle {
+  color: #9ca3af;
+  margin-bottom: var(--spacing-sm);
+  font-family: var(--font-poppins);
+  font-size: var(--font-size-base);
+}
+
+.emailDisplay {
+  color: #60a5fa;
+  font-weight: var(--font-weight-medium);
+  margin-bottom: var(--spacing-xl);
+  font-family: var(--font-poppins);
+  font-size: var(--font-size-base);
+}
+
+.formContent {
+  display: flex;
+  flex-direction: column;
+  gap: var(--spacing-lg);
+}
+
+.otpContainer {
+  display: flex;
+  justify-content: center;
+}
+
+.otpInput {
+  gap: var(--spacing-sm);
+}
+
+.otpSlot {
+  width: 3rem;
+  height: 3rem;
+  font-size: var(--font-size-lg);
+  font-weight: var(--font-weight-semibold);
+  background-color: #374151;
+  border: 1px solid #4b5563;
+  color: white;
+  border-radius: var(--radius-md);
+  text-align: center;
+  font-family: var(--font-poppins);
+}
+
+.otpSlot:focus {
+  outline: 2px solid #2563eb;
+  outline-offset: 2px;
+  border-color: #2563eb;
+}
+
+.successMessage {
+  display: flex;
+  align-items: center;
+  gap: var(--spacing-sm);
+  padding: var(--spacing-sm) var(--spacing-md);
+  background-color: rgba(34, 197, 94, 0.1);
+  border: 1px solid rgba(34, 197, 94, 0.3);
+  border-radius: var(--radius-md);
+  color: #22c55e;
+  font-size: var(--font-size-sm);
+  font-family: var(--font-poppins);
+  font-weight: var(--font-weight-medium);
+}
+
+.successIcon {
+  width: 1.25rem;
+  height: 1.25rem;
+  flex-shrink: 0;
+}
+
+.errorMessage {
+  padding: var(--spacing-sm) var(--spacing-md);
+  background-color: rgba(248, 113, 113, 0.1);
+  border: 1px solid rgba(248, 113, 113, 0.3);
+  border-radius: var(--radius-md);
+  color: #f87171;
+  font-size: var(--font-size-sm);
+  font-family: var(--font-poppins);
+  line-height: 1.4;
+}
+
+.verifyButton {
+  width: 100%;
+  padding: var(--spacing-md);
+  font-size: var(--font-size-lg);
+  font-family: var(--font-poppins);
+  font-weight: var(--font-weight-medium);
+  background-color: #2563eb;
+  color: white;
+  border: none;
+  border-radius: var(--radius-lg);
+  cursor: pointer;
+  transition: all var(--transition-normal);
+  outline: none;
+}
+
+.verifyButton:hover:not(:disabled) {
+  background-color: #1d4ed8;
+}
+
+.verifyButton:focus-visible {
+  outline: 2px solid #3b82f6;
+  outline-offset: 2px;
+}
+
+.verifyButton:disabled {
+  background-color: #4b5563;
+  cursor: not-allowed;
+  opacity: 0.6;
+}
+
+.loadingContainer {
+  display: flex;
+  align-items: center;
+  gap: var(--spacing-sm);
+}
+
+.spinnerIcon {
+  width: 1rem;
+  height: 1rem;
+  animation: spin 1s linear infinite;
+}
+
+@keyframes spin {
+  from {
+    transform: rotate(0deg);
+  }
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+.resendSection {
+  text-align: center;
+}
+
+.resendText {
+  color: #9ca3af;
+  margin-bottom: var(--spacing-sm);
+  font-family: var(--font-poppins);
+  font-size: var(--font-size-base);
+}
+
+.resendButton {
+  color: #60a5fa;
+  text-decoration: none;
+  cursor: pointer;
+  font-family: var(--font-poppins);
+  transition: color var(--transition-normal);
+  background: none;
+  border: none;
+  padding: 0;
+  font-size: inherit;
+}
+
+.resendButton:hover {
+  color: #93c5fd;
+}

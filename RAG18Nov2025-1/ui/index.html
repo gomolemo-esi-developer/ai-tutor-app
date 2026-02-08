@@ -1,0 +1,80 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>RAG Tutoring Chatbot</title>
+    <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+    <div class="container">
+        <!-- Header -->
+        <header class="header">
+            <h1>🤖 RAG Tutoring Chatbot</h1>
+            <p class="subtitle">Select documents and ask questions</p>
+        </header>
+
+        <!-- Main Content -->
+        <div class="main-content">
+            <!-- Sidebar -->
+            <aside class="sidebar">
+                <div class="sidebar-header">
+                    <h2>📚 Documents</h2>
+                    <button id="selectAll" class="btn-secondary">Select All</button>
+                </div>
+                
+                <div class="document-list" id="documentList">
+                    <div class="loading">Loading documents...</div>
+                </div>
+
+                <div class="selected-count">
+                    <span id="selectedCount">0 selected</span>
+                </div>
+
+                <div class="model-info">
+                    <div class="info-item">
+                        <span class="label">Model:</span>
+                        <span class="value" id="modelName">Loading...</span>
+                    </div>
+                    <div class="info-item">
+                        <span class="label">Status:</span>
+                        <span class="value status-indicator" id="statusIndicator">●</span>
+                    </div>
+                </div>
+            </aside>
+
+            <!-- Chat Area -->
+            <main class="chat-container">
+                <div class="chat-messages" id="chatMessages">
+                    <div class="welcome-message">
+                        <h2>👋 Welcome!</h2>
+                        <p>Select one or more documents from the sidebar and start asking questions.</p>
+                    </div>
+                </div>
+
+                <!-- Input Area -->
+                <div class="chat-input-container">
+                    <div class="input-wrapper">
+                        <textarea 
+                            id="messageInput" 
+                            placeholder="Ask a question about your selected documents..."
+                            rows="1"
+                        ></textarea>
+                        <button id="sendButton" class="btn-send" disabled>
+                            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                <path d="M22 2L11 13M22 2l-7 20-4-9-9-4 20-7z"/>
+                            </svg>
+                        </button>
+                    </div>
+                    <div class="input-hint" id="inputHint">
+                        Select at least one document to start chatting
+                    </div>
+                </div>
+            </main>
+        </div>
+    </div>
+
+    <script src="app.js"></script>
+</body>
+</html>
+

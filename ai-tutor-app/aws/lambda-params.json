@@ -1,0 +1,18 @@
+[
+  {
+    "ParameterKey": "EnvironmentName",
+    "ParameterValue": "production"
+  },
+  {
+    "ParameterKey": "LambdaCodeBucket",
+    "ParameterValue": "tutorverse-infrastructure"
+  },
+  {
+    "ParameterKey": "LambdaCodeZipKey",
+    "ParameterValue": "lambda-code.zip"
+  },
+  {
+    "ParameterKey": "ApiGatewayId",
+    "ParameterValue": "4pf36kknz8"
+  }
+]

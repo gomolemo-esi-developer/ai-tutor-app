@@ -1,0 +1,327 @@
+{
+  "_comment": "TutorVerse Sample Data - Reference Format for All 14 DynamoDB Tables",
+  
+  "campuses": [
+    {
+      "campusId": "uuid-campus-001",
+      "campusName": "Main Campus",
+      "campusCode": "MAIN",
+      "location": "123 University Drive",
+      "city": "Lagos",
+      "state": "Lagos State",
+      "country": "Nigeria",
+      "phone": "+234 1 123 4567",
+      "email": "main@tutorverse.edu",
+      "principal": "admin-001",
+      "status": "active",
+      "createdAt": 1705520000000,
+      "updatedAt": 1705520000000
+    }
+  ],
+
+  "faculties": [
+    {
+      "facultyId": "uuid-faculty-001",
+      "facultyName": "Faculty of Science",
+      "facultyCode": "FOS",
+      "description": "Science and Technology programs",
+      "dean": "prof-001",
+      "phone": "+234 1 111 1111",
+      "email": "science@tutorverse.edu",
+      "status": "active",
+      "createdAt": 1705520000000,
+      "updatedAt": 1705520000000
+    }
+  ],
+
+  "departments": [
+    {
+      "departmentId": "uuid-dept-001",
+      "facultyId": "uuid-faculty-001",
+      "departmentName": "Computer Science",
+      "departmentCode": "CS",
+      "description": "Computer Science and Information Technology",
+      "headOfDepartment": "dr-001",
+      "phone": "+234 1 444 4444",
+      "email": "cs@tutorverse.edu",
+      "location": "Block A, Main Campus",
+      "status": "active",
+      "createdAt": 1705520000000,
+      "updatedAt": 1705520000000
+    }
+  ],
+
+  "users": [
+    {
+      "userId": "admin-001",
+      "email": "admin@tutorverse.edu",
+      "firstName": "Admin",
+      "lastName": "User",
+      "role": "admin",
+      "status": "active",
+      "isActive": true,
+      "campusId": "uuid-campus-001",
+      "departmentId": "uuid-dept-001",
+      "lastLogin": 1705520000000,
+      "createdAt": 1704915200000,
+      "updatedAt": 1705520000000
+    },
+    {
+      "userId": "lecturer-001",
+      "email": "prof.smith@tutorverse.edu",
+      "firstName": "John",
+      "lastName": "Smith",
+      "role": "educator",
+      "status": "active",
+      "isActive": true,
+      "campusId": "uuid-campus-001",
+      "departmentId": "uuid-dept-001",
+      "lastLogin": 1705434400000,
+      "createdAt": 1703596800000,
+      "updatedAt": 1705520000000
+    },
+    {
+      "userId": "student-001",
+      "email": "alice.johnson@tutorverse.edu",
+      "firstName": "Alice",
+      "lastName": "Johnson",
+      "role": "student",
+      "status": "active",
+      "isActive": true,
+      "campusId": "uuid-campus-001",
+      "departmentId": "uuid-dept-001",
+      "lastLogin": 1705520000000,
+      "createdAt": 1697241600000,
+      "updatedAt": 1705520000000
+    }
+  ],
+
+  "lecturers": [
+    {
+      "lecturerId": "uuid-lecturer-001",
+      "userId": "lecturer-001",
+      "staffNumber": "LEC001",
+      "firstName": "John",
+      "lastName": "Smith",
+      "email": "prof.smith@tutorverse.edu",
+      "departmentId": "uuid-dept-001",
+      "qualifications": "PhD Computer Science, MSc Software Engineering",
+      "specialization": "Machine Learning and Artificial Intelligence",
+      "officeLocation": "A-306",
+      "phone": "+234 1 800 0001",
+      "status": "active",
+      "createdAt": 1703596800000,
+      "updatedAt": 1705520000000
+    }
+  ],
+
+  "students": [
+    {
+      "studentId": "uuid-student-001",
+      "userId": "student-001",
+      "studentNumber": "STU001",
+      "firstName": "Alice",
+      "lastName": "Johnson",
+      "email": "alice.johnson@tutorverse.edu",
+      "departmentId": "uuid-dept-001",
+      "enrollmentYear": 2022,
+      "status": "active",
+      "gpa": 3.85,
+      "phone": "+234 1 900 0001",
+      "dateOfBirth": "2002-05-15",
+      "createdAt": 1697241600000,
+      "updatedAt": 1705520000000
+    }
+  ],
+
+  "courses": [
+    {
+      "courseId": "uuid-course-001",
+      "departmentId": "uuid-dept-001",
+      "courseName": "Bachelor of Science in Computer Science",
+      "courseCode": "CS_BSC",
+      "description": "4-year undergraduate program in Computer Science",
+      "duration": 4,
+      "level": "100",
+      "totalCredits": 120,
+      "startDate": "2022-09-01",
+      "coordinator": "lecturer-001",
+      "status": "active",
+      "createdAt": 1661990400000,
+      "updatedAt": 1705520000000
+    }
+  ],
+
+  "modules": [
+    {
+      "moduleId": "uuid-module-001",
+      "courseId": "uuid-course-001",
+      "moduleCode": "CS101",
+      "moduleName": "Introduction to Programming",
+      "description": "Fundamentals of programming concepts using Python",
+      "credits": 3,
+      "semesterOffered": "1",
+      "lecturerId": "uuid-lecturer-001",
+      "status": "active",
+      "createdAt": 1703596800000,
+      "updatedAt": 1705520000000
+    }
+  ],
+
+  "files": [
+    {
+      "fileId": "uuid-file-001",
+      "moduleId": "uuid-module-001",
+      "fileName": "Python Basics Introduction.pdf",
+      "fileType": "application/pdf",
+      "fileSize": 2048576,
+      "s3Key": "modules/CS101/python-basics.pdf",
+      "s3Bucket": "aitutor-files-development-123456789",
+      "uploadedBy": "lecturer-001",
+      "uploadedAt": 1703337600000,
+      "description": "Introduction to Python programming fundamentals",
+      "isPublished": true,
+      "downloadCount": 45,
+      "createdAt": 1703337600000,
+      "updatedAt": 1705520000000
+    }
+  ],
+
+  "chat_sessions": [
+    {
+      "sessionId": "uuid-session-001",
+      "studentId": "student-001",
+      "moduleId": "uuid-module-001",
+      "createdAt": 1705094400000,
+      "expiresAt": 1705785600000,
+      "topic": "Python Basics - Understanding Variables",
+      "messageCount": 12,
+      "status": "closed",
+      "lastMessageAt": 1705180800000,
+      "updatedAt": 1705180800000
+    }
+  ],
+
+  "chat_messages": [
+    {
+      "messageId": "uuid-msg-001",
+      "sessionId": "uuid-session-001",
+      "role": "student",
+      "content": "What is the difference between a variable and a constant in Python?",
+      "timestamp": 1705094400000,
+      "expiresAt": 1705785600000,
+      "metadata": {
+        "source": "web"
+      },
+      "createdAt": 1705094400000
+    },
+    {
+      "messageId": "uuid-msg-002",
+      "sessionId": "uuid-session-001",
+      "role": "ai",
+      "content": "A variable in Python is a name that refers to a value that can change, while a constant is meant to be a fixed value. Variables can be reassigned, but constants should not be changed after initial assignment.",
+      "timestamp": 1705094400000,
+      "expiresAt": 1705785600000,
+      "metadata": {
+        "confidence": 0.95
+      },
+      "createdAt": 1705094400000
+    }
+  ],
+
+  "quiz_results": [
+    {
+      "quizId": "uuid-quiz-001",
+      "studentId": "student-001",
+      "moduleId": "uuid-module-001",
+      "expiresAt": 1707998400000,
+      "questions": [
+        "What is a variable in Python?",
+        "How do you declare a variable?",
+        "What types of data can variables hold?"
+      ],
+      "answers": [
+        "A named value that can change",
+        "name = value",
+        "strings, integers, floats, etc"
+      ],
+      "score": 85,
+      "totalQuestions": 3,
+      "correctAnswers": 3,
+      "generatedAt": 1705008000000,
+      "submittedAt": 1704921600000,
+      "duration": 900,
+      "feedback": "Excellent understanding of Python variables. Well done!",
+      "status": "graded"
+    }
+  ],
+
+  "summary_results": [
+    {
+      "summaryId": "uuid-summary-001",
+      "studentId": "student-001",
+      "moduleId": "uuid-module-001",
+      "fileId": "uuid-file-001",
+      "expiresAt": 1707998400000,
+      "originalContent": "Python is a high-level programming language...",
+      "summaryText": "Python is a versatile programming language used for web development, data science, and automation. It emphasizes readability and simplicity.",
+      "summaryLength": "short",
+      "keyPoints": [
+        "High-level language",
+        "Readable syntax",
+        "Multiple applications",
+        "Beginner-friendly"
+      ],
+      "generatedAt": 1704921600000,
+      "regenerationCount": 1,
+      "rating": 5,
+      "feedback": "Very accurate and helpful summary",
+      "status": "active"
+    }
+  ],
+
+  "audit_logs": [
+    {
+      "logId": "uuid-log-001",
+      "userId": "admin-001",
+      "timestamp": 1703596800000,
+      "ttl": 1706275200,
+      "action": "create",
+      "entityType": "department",
+      "entityId": "uuid-dept-001",
+      "oldValues": {},
+      "newValues": {
+        "departmentName": "Computer Science",
+        "departmentCode": "CS"
+      },
+      "ipAddress": "192.168.1.1",
+      "userAgent": "Mozilla/5.0"
+    }
+  ],
+
+  "NOTES": {
+    "timestamps": "All timestamps in milliseconds (NOT seconds). Example: 1705520000000 = Jan 18 2024",
+    "ids": "All ID fields should be UUID v4 format: xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx",
+    "never_use": ["N/A", "None", "null strings", "empty strings", "0 for missing numbers"],
+    "always_use": ["Actual values", "true/false for booleans", "numeric values for counts", "proper names and codes"],
+    "required_fields": {
+      "all_tables": ["id field (specific name per table)", "createdAt", "status (where applicable)"],
+      "users": ["email", "firstName", "lastName", "role"],
+      "lecturers": ["departmentId", "staffNumber"],
+      "students": ["studentNumber", "departmentId"],
+      "modules": ["moduleCode", "courseId"],
+      "files": ["s3Key", "s3Bucket", "fileSize"],
+      "chat_sessions": ["studentId", "moduleId", "topic"],
+      "quiz_results": ["studentId", "moduleId", "score"],
+      "summary_results": ["studentId", "moduleId"]
+    },
+    "valid_statuses": {
+      "users": ["active", "inactive", "suspended"],
+      "students": ["active", "graduated", "suspended", "inactive"],
+      "lecturers": ["active", "inactive", "on_leave"],
+      "modules": ["active", "inactive", "archived", "draft"],
+      "chat": ["active", "closed", "archived"],
+      "quiz": ["draft", "submitted", "graded"]
+    }
+  }
+}

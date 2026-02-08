@@ -1,0 +1,2 @@
+RAG18Nov2025-1/conversion/models/models--Systran--faster-whisper-medium/snapshots/*/model.bin filter=lfs diff=lfs merge=lfs -text
+*.bin filter=lfs diff=lfs merge=lfs -text

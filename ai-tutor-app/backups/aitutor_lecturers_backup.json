@@ -1,0 +1,32 @@
+[
+  {
+    "departmentId": "",
+    "lastName": "Doe",
+    "createdAt": "1768251414",
+    "email": "jane.doe@university.edu",
+    "campusId": "",
+    "moduleIds": [],
+    "firstName": "Jane",
+    "lecturerId": "efb626e6-e6ff-42ac-bb34-31e726081798",
+    "userId": "b5e92fd6-7c63-431c-ba20-92472a5914b2",
+    "updatedAt": "1768251414",
+    "staffNumber": "E002",
+    "id": "efb626e6-e6ff-42ac-bb34-31e726081798",
+    "registrationStatus": "pending_activation"
+  },
+  {
+    "departmentId": "",
+    "lastName": "Smith",
+    "createdAt": "1768251411",
+    "email": "john.smith@university.edu",
+    "campusId": "",
+    "moduleIds": [],
+    "firstName": "John",
+    "lecturerId": "b40ddceb-75de-4d69-8a42-cd51dd4c2da3",
+    "userId": "857c5201-7382-4c16-8452-a4a7d461a3a7",
+    "updatedAt": "1768251411",
+    "staffNumber": "E001",
+    "id": "b40ddceb-75de-4d69-8a42-cd51dd4c2da3",
+    "registrationStatus": "pending_activation"
+  }
+]

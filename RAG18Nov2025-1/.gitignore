@@ -1,0 +1,44 @@
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+0_data/contenttypes/
+0_data/input/
+6_conversion/models/
+# Virtual Environment
+venv/
+env/
+ENV/
+.venv
+
+# Environment variables
+.env
+.env.local
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# OS
+.DS_Store
+Thumbs.db
+
+# ChromaDB
+chroma_db/
+*.sqlite3
+
+# Logs
+*.log
+*.txt
+
+# Distribution / packaging
+dist/
+build/
+*.egg-info/
+
+5_docs/AI Quiz & AI Simmary JSON FILE.pdf

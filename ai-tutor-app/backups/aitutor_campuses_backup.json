@@ -1,0 +1,14 @@
+[
+  {
+    "city": "New York",
+    "code": "MAIN",
+    "establishedYear": "1990",
+    "updatedAt": "1768251203",
+    "createdAt": "1768251203",
+    "id": "d1686be5-8728-4b40-b384-35ffd6ffd65f",
+    "country": "USA",
+    "campusId": "60edd3ca-f49b-4f58-bc6d-a961fb1d4015",
+    "name": "Main Campus",
+    "coordinates": "40.7128,-74.0060"
+  }
+]
