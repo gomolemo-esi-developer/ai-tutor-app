@@ -20,14 +20,22 @@ RUN pip install --upgrade pip && \
 # Copy source code
 COPY RAG18Nov2025-1/ .
 
-# Create directories for volumes
-RUN mkdir -p /app/data /app/chroma_db
+# Create directories for volumes and conversions
+RUN mkdir -p /app/data \
+    /app/chroma_db \
+    /app/conversion \
+    /app/conversion/output \
+    /app/conversion/models
 
 # Create non-root user for security
 RUN groupadd -r python && useradd -r -g python python
 
-# Fix permissions so python user can write to volumes
-RUN chown -R python:python /app/data /app/chroma_db
+# Fix permissions so python user can write to all directories
+RUN chown -R python:python /app/data \
+    /app/chroma_db \
+    /app/conversion \
+    /app/conversion/output \
+    /app/conversion/models
 
 USER python
 
