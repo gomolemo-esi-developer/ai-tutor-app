@@ -37,24 +37,8 @@ export class S3Service {
       let url = await getSignedUrl(this.client, command, {
         expiresIn: expirySeconds,
       });
-      
-      const originalUrl = url;
-      
-      // Convert path-style to virtual-hosted style if using path-style
-      if (url.includes('s3.amazonaws.com/') && !url.includes('.s3.')) {
-        const region = EnvConfig.get('AWS_REGION');
-        // Extract query string
-        const queryIndex = url.indexOf('?');
-        const queryString = queryIndex > -1 ? url.substring(queryIndex) : '';
-        // Extract key (everything after bucket)
-        const pathMatch = url.match(/amazonaws\.com\/([^?]*)/);
-        if (pathMatch) {
-          const keyPath = pathMatch[1];
-          url = `https://${bucket}.s3.${region}.amazonaws.com/${keyPath}${queryString}`;
-        }
-      }
 
-      LoggerUtil.info('Generated upload URL', { key, originalUrl, convertedUrl: url, isConverted: url !== originalUrl });
+      LoggerUtil.info('Generated upload URL', { key, url });
       return url;
     } catch (error) {
       LoggerUtil.error('Failed to generate upload URL', error as Error);
@@ -82,24 +66,8 @@ export class S3Service {
       let url = await getSignedUrl(this.client, command, {
         expiresIn: expirySeconds,
       });
-      
-      const originalUrl = url;
-      
-      // Convert path-style to virtual-hosted style if using path-style
-      if (url.includes('s3.amazonaws.com/') && !url.includes('.s3.')) {
-        const region = EnvConfig.get('AWS_REGION');
-        // Extract query string
-        const queryIndex = url.indexOf('?');
-        const queryString = queryIndex > -1 ? url.substring(queryIndex) : '';
-        // Extract key (everything after bucket)
-        const pathMatch = url.match(/amazonaws\.com\/([^?]*)/);
-        if (pathMatch) {
-          const keyPath = pathMatch[1];
-          url = `https://${bucket}.s3.${region}.amazonaws.com/${keyPath}${queryString}`;
-        }
-      }
 
-      LoggerUtil.info('Generated download URL', { key, fileName, originalUrl, convertedUrl: url, isConverted: url !== originalUrl });
+      LoggerUtil.info('Generated download URL', { key, fileName, url });
       return url;
     } catch (error) {
       LoggerUtil.error('Failed to generate download URL', error as Error);

@@ -37,8 +37,8 @@ export class AwsConfig {
   }
 
   /**
-   * Get S3 client
-   */
+    * Get S3 client
+    */
   static getS3Client(): S3Client {
     if (!s3Client) {
       const config = EnvConfig.getConfig();
