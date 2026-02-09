@@ -19,7 +19,7 @@ COPY ai-tutor-app/tutorverse-hub-main/package.json ./
 COPY ai-tutor-app/tutorverse-hub-main/package-lock.json ./
 
 # Install dependencies
-RUN npm ci --verbose
+RUN npm install
 
 # Copy source code
 COPY ai-tutor-app/tutorverse-hub-main/src ./src
