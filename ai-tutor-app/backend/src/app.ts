@@ -315,37 +315,35 @@ app.post('/api/educator/files/upload-link',
   adaptLambdaHandler(getUploadLinkHandler)
 );
 // Direct upload proxy - bypass CORS by uploading through backend
+// Configure raw body parser for upload endpoint (must be before route definition)
+const uploadMiddleware = express.raw({ type: 'application/octet-stream', limit: '100MB' });
+
 app.post('/api/educator/files/upload',
+  uploadMiddleware,
   authMiddleware,
   roleMiddleware(['EDUCATOR']),
-  express.raw({ type: 'application/octet-stream', limit: '100MB' }),
-  async (req: any, res: express.Response) => {
-    try {
-      const userId = req.user?.sub || (req as any).userId;
-      const fileId = req.headers['x-file-id'] as string;
-      const moduleCode = req.headers['x-module-code'] as string;
-      const fileName = req.headers['x-file-name'] as string;
-      
-      if (!userId || !fileId || !moduleCode || !fileName) {
-        return res.status(400).json({ error: 'Missing required headers' });
-      }
-
-      const { S3Service } = await import('./services/s3.service');
-      const key = `modules/${moduleCode}/${fileId}/${fileName}`;
-      
-      // Upload directly to S3
-      await S3Service.uploadFile(
-        key,
-        req.body as Buffer,
-        req.headers['content-type'] || 'application/octet-stream'
-      );
-
-      res.json({ success: true, fileId, s3Key: key });
-    } catch (error: any) {
-      console.error('Upload proxy error:', error);
-      res.status(500).json({ error: error.message });
+  asyncHandler(async (req: any, res: express.Response) => {
+    const userId = req.user?.sub || (req as any).userId;
+    const fileId = req.headers['x-file-id'] as string;
+    const moduleCode = req.headers['x-module-code'] as string;
+    const fileName = req.headers['x-file-name'] as string;
+    
+    if (!userId || !fileId || !moduleCode || !fileName) {
+      return res.status(400).json({ error: 'Missing required headers' });
     }
-  }
+
+    const { S3Service } = await import('./services/s3.service');
+    const key = `modules/${moduleCode}/${fileId}/${fileName}`;
+    
+    // Upload directly to S3
+    await S3Service.uploadFile(
+      key,
+      req.body as Buffer,
+      req.headers['content-type'] || 'application/octet-stream'
+    );
+
+    res.json({ success: true, fileId, s3Key: key });
+  })
 );
 app.post('/api/educator/files',
   authMiddleware,
