@@ -44,6 +44,7 @@ export class AwsConfig {
       const config = EnvConfig.getConfig();
       s3Client = new S3Client({
         region: config.AWS_REGION,
+        forcePathStyle: false,
       });
     }
 
