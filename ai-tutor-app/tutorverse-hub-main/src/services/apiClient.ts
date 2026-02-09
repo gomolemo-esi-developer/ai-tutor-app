@@ -69,6 +69,13 @@ class ApiClient {
   }
 
   /**
+   * Get base URL for absolute API calls
+   */
+  getBaseURL(): string {
+    return this.baseURL;
+  }
+
+  /**
    * Clear token (logout)
    */
   clearToken(): void {

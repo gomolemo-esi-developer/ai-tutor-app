@@ -9,6 +9,7 @@ import {
 } from '@/components/ui/select';
 import { useAuth } from '@/contexts/AuthContext';
 import { EducatorService } from '@/services/EducatorService';
+import { apiClient } from '@/lib/api';
 import styles from './FileUploadModal.module.css';
 
 interface FileUploadModalProps {
@@ -340,12 +341,18 @@ export const FileUploadModal: React.FC<FileUploadModalProps> = ({
                             reject(new Error('Upload failed'));
                         });
 
-                        // Use backend proxy endpoint
-                        xhr.open('POST', '/api/educator/files/upload');
+                        // Use absolute backend URL to avoid nginx proxy issues
+                        const uploadUrl = `${apiClient.getBaseURL()}/api/educator/files/upload`;
+                        const token = auth?.accessToken;
+                        
+                        xhr.open('POST', uploadUrl);
                         xhr.setRequestHeader('Content-Type', 'application/octet-stream');
                         xhr.setRequestHeader('X-File-ID', fileId);
                         xhr.setRequestHeader('X-Module-Code', moduleCodeToUse);
                         xhr.setRequestHeader('X-File-Name', uf.file.name);
+                        if (token) {
+                            xhr.setRequestHeader('Authorization', `Bearer ${token}`);
+                        }
                         xhr.send(uf.file);
                     });
 
