@@ -319,9 +319,9 @@ app.post('/api/educator/files/upload',
   authMiddleware,
   roleMiddleware(['EDUCATOR']),
   express.raw({ type: 'application/octet-stream', limit: '100MB' }),
-  async (req: express.Request, res: express.Response) => {
+  async (req: any, res: express.Response) => {
     try {
-      const userId = req.user?.sub;
+      const userId = req.user?.sub || (req as any).userId;
       const fileId = req.headers['x-file-id'] as string;
       const moduleCode = req.headers['x-module-code'] as string;
       const fileName = req.headers['x-file-name'] as string;
