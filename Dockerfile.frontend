@@ -2,6 +2,18 @@ FROM node:20-alpine AS builder
 
 WORKDIR /app
 
+# Build arguments for Vite
+ARG VITE_API_URL=https://tutorverse-backend-kpls.onrender.com
+ARG VITE_API_BASE_URL=https://tutorverse-backend-kpls.onrender.com/api
+ARG VITE_BACKEND_URL=https://tutorverse-backend-kpls.onrender.com
+ARG NODE_ENV=production
+
+# Set as environment variables for the build
+ENV VITE_API_URL=${VITE_API_URL}
+ENV VITE_API_BASE_URL=${VITE_API_BASE_URL}
+ENV VITE_BACKEND_URL=${VITE_BACKEND_URL}
+ENV NODE_ENV=${NODE_ENV}
+
 # Copy package files
 COPY ai-tutor-app/tutorverse-hub-main/package*.json ./
 
@@ -19,7 +31,7 @@ COPY ai-tutor-app/tutorverse-hub-main/postcss.config.js ./
 COPY ai-tutor-app/tutorverse-hub-main/components.json ./
 COPY ai-tutor-app/tutorverse-hub-main/eslint.config.js ./
 
-# Build (no API URL needed - set at runtime via nginx)
+# Build with Vite environment variables
 RUN npm run build
 
 # Production stage
