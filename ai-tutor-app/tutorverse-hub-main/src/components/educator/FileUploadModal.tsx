@@ -120,7 +120,7 @@ export const FileUploadModal: React.FC<FileUploadModalProps> = ({
         author: '',
     });
 
-    const { user } = useAuth();
+    const { user, token } = useAuth();
 
     // Set default content types and author on mount
     useEffect(() => {
@@ -343,7 +343,6 @@ export const FileUploadModal: React.FC<FileUploadModalProps> = ({
 
                         // Use absolute backend URL to avoid nginx proxy issues
                         const uploadUrl = `${apiClient.getBaseURL()}/api/educator/files/upload`;
-                        const token = auth?.accessToken;
                         
                         console.log('📤 Starting file upload', {
                             uploadUrl,
