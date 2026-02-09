@@ -33,21 +33,26 @@ export class S3Service {
         Key: key,
       });
 
-      // Generate URL and force virtual-hosted style
+      // Generate URL
       let url = await getSignedUrl(this.client, command, {
         expiresIn: expirySeconds,
       });
       
-      // Convert path-style to virtual-hosted style if needed
-      if (url.includes('/s3.') && !url.includes(bucket + '.s3')) {
+      // Convert path-style to virtual-hosted style if using path-style
+      if (url.includes('s3.amazonaws.com/') && !url.includes('.s3.')) {
         const region = EnvConfig.get('AWS_REGION');
-        url = url.replace(
-          `https://s3.${region}.amazonaws.com/${bucket}/`,
-          `https://${bucket}.s3.${region}.amazonaws.com/`
-        );
+        // Extract query string
+        const queryIndex = url.indexOf('?');
+        const queryString = queryIndex > -1 ? url.substring(queryIndex) : '';
+        // Extract key (everything after bucket)
+        const pathMatch = url.match(/amazonaws\.com\/([^?]*)/);
+        if (pathMatch) {
+          const keyPath = pathMatch[1];
+          url = `https://${bucket}.s3.${region}.amazonaws.com/${keyPath}${queryString}`;
+        }
       }
 
-      LoggerUtil.debug('Generated upload URL', { key, expiresIn: expirySeconds });
+      LoggerUtil.debug('Generated upload URL', { key, expiresIn: expirySeconds, url });
       return url;
     } catch (error) {
       LoggerUtil.error('Failed to generate upload URL', error as Error);
@@ -71,21 +76,26 @@ export class S3Service {
         ResponseContentDisposition: fileName ? `attachment; filename="${fileName}"` : 'attachment',
       });
 
-      // Generate URL and force virtual-hosted style
+      // Generate URL
       let url = await getSignedUrl(this.client, command, {
         expiresIn: expirySeconds,
       });
       
-      // Convert path-style to virtual-hosted style if needed
-      if (url.includes('/s3.') && !url.includes(bucket + '.s3')) {
+      // Convert path-style to virtual-hosted style if using path-style
+      if (url.includes('s3.amazonaws.com/') && !url.includes('.s3.')) {
         const region = EnvConfig.get('AWS_REGION');
-        url = url.replace(
-          `https://s3.${region}.amazonaws.com/${bucket}/`,
-          `https://${bucket}.s3.${region}.amazonaws.com/`
-        );
+        // Extract query string
+        const queryIndex = url.indexOf('?');
+        const queryString = queryIndex > -1 ? url.substring(queryIndex) : '';
+        // Extract key (everything after bucket)
+        const pathMatch = url.match(/amazonaws\.com\/([^?]*)/);
+        if (pathMatch) {
+          const keyPath = pathMatch[1];
+          url = `https://${bucket}.s3.${region}.amazonaws.com/${keyPath}${queryString}`;
+        }
       }
 
-      LoggerUtil.debug('Generated download URL', { key, expiresIn: expirySeconds, fileName });
+      LoggerUtil.debug('Generated download URL', { key, expiresIn: expirySeconds, fileName, url });
       return url;
     } catch (error) {
       LoggerUtil.error('Failed to generate download URL', error as Error);
