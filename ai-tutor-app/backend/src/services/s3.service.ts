@@ -27,14 +27,25 @@ export class S3Service {
     expirySeconds: number = 900 // 15 minutes
   ): Promise<string> {
     try {
+      const bucket = this.bucket;
       const command = new PutObjectCommand({
-        Bucket: this.bucket,
+        Bucket: bucket,
         Key: key,
       });
 
-      const url = await getSignedUrl(this.client, command, {
+      // Generate URL and force virtual-hosted style
+      let url = await getSignedUrl(this.client, command, {
         expiresIn: expirySeconds,
       });
+      
+      // Convert path-style to virtual-hosted style if needed
+      if (url.includes('/s3.') && !url.includes(bucket + '.s3')) {
+        const region = EnvConfig.get('AWS_REGION');
+        url = url.replace(
+          `https://s3.${region}.amazonaws.com/${bucket}/`,
+          `https://${bucket}.s3.${region}.amazonaws.com/`
+        );
+      }
 
       LoggerUtil.debug('Generated upload URL', { key, expiresIn: expirySeconds });
       return url;
@@ -53,15 +64,26 @@ export class S3Service {
     fileName?: string
   ): Promise<string> {
     try {
+      const bucket = this.bucket;
       const command = new GetObjectCommand({
-        Bucket: this.bucket,
+        Bucket: bucket,
         Key: key,
         ResponseContentDisposition: fileName ? `attachment; filename="${fileName}"` : 'attachment',
       });
 
-      const url = await getSignedUrl(this.client, command, {
+      // Generate URL and force virtual-hosted style
+      let url = await getSignedUrl(this.client, command, {
         expiresIn: expirySeconds,
       });
+      
+      // Convert path-style to virtual-hosted style if needed
+      if (url.includes('/s3.') && !url.includes(bucket + '.s3')) {
+        const region = EnvConfig.get('AWS_REGION');
+        url = url.replace(
+          `https://s3.${region}.amazonaws.com/${bucket}/`,
+          `https://${bucket}.s3.${region}.amazonaws.com/`
+        );
+      }
 
       LoggerUtil.debug('Generated download URL', { key, expiresIn: expirySeconds, fileName });
       return url;
