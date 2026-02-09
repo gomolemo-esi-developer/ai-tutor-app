@@ -41,6 +41,12 @@ services:
          value: us-east-2
        - key: ENVIRONMENT
          value: production
+       - key: S3_BUCKET
+         value: aitutor-files-production-975050334073
+         sync: false
+       - key: CORS_ORIGIN
+         value: 'https://ai-tutor-ocue.onrender.com'
+         sync: false
        - key: FRONTEND_URL
          value: https://ai-tutor-ocue.onrender.com
          sync: false
