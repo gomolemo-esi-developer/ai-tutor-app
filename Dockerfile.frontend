@@ -18,8 +18,9 @@ ENV NODE_ENV=${NODE_ENV}
 COPY ai-tutor-app/tutorverse-hub-main/package.json ./
 COPY ai-tutor-app/tutorverse-hub-main/package-lock.json ./
 
-# Install dependencies
-RUN npm install
+# Install dependencies with error handling
+RUN npm install --no-audit && \
+    ls -la node_modules/.bin/vite || (echo "Vite not found!" && exit 1)
 
 # Copy source code
 COPY ai-tutor-app/tutorverse-hub-main/src ./src
