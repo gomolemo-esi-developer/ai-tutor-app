@@ -345,6 +345,13 @@ export const FileUploadModal: React.FC<FileUploadModalProps> = ({
                         const uploadUrl = `${apiClient.getBaseURL()}/api/educator/files/upload`;
                         const token = auth?.accessToken;
                         
+                        console.log('📤 Starting file upload', {
+                            uploadUrl,
+                            fileName: uf.file.name,
+                            fileSize: uf.file.size,
+                            hasToken: !!token,
+                        });
+                        
                         xhr.open('POST', uploadUrl);
                         xhr.setRequestHeader('Content-Type', 'application/octet-stream');
                         xhr.setRequestHeader('X-File-ID', fileId);
