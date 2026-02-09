@@ -30,6 +30,9 @@ WORKDIR /app
 # Copy built dist folder from builder
 COPY --from=builder /app/dist ./dist
 
+# Copy nginx config
+COPY nginx.conf /etc/nginx/conf.d/default.conf.template
+
 # Copy dynamic entrypoint script
 COPY docker-entrypoint.sh /docker-entrypoint.sh
 
@@ -47,5 +50,5 @@ EXPOSE 3000
 HEALTHCHECK --interval=30s --timeout=10s --start-period=10s --retries=3 \
   CMD wget --quiet --tries=1 --spider http://localhost:3000/ || exit 1
 
-# Use dynamic entrypoint for environment variable substitution
+# Use dynamic entrypoint
 ENTRYPOINT ["/docker-entrypoint.sh"]
