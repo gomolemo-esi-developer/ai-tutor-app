@@ -15,10 +15,11 @@ ENV VITE_BACKEND_URL=${VITE_BACKEND_URL}
 ENV NODE_ENV=${NODE_ENV}
 
 # Copy package files
-COPY ai-tutor-app/tutorverse-hub-main/package*.json ./
+COPY ai-tutor-app/tutorverse-hub-main/package.json ./
+COPY ai-tutor-app/tutorverse-hub-main/package-lock.json ./
 
 # Install dependencies
-RUN npm ci
+RUN npm ci --verbose
 
 # Copy source code
 COPY ai-tutor-app/tutorverse-hub-main/src ./src
