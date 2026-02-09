@@ -1,47 +1,10 @@
-FROM node:20-alpine AS builder
-
-WORKDIR /app
-
-# Build arguments for Vite
-ARG VITE_API_URL=https://tutorverse-backend-kpls.onrender.com
-ARG VITE_API_BASE_URL=https://tutorverse-backend-kpls.onrender.com/api
-ARG VITE_BACKEND_URL=https://tutorverse-backend-kpls.onrender.com
-ARG NODE_ENV=production
-
-# Set as environment variables for the build
-ENV VITE_API_URL=${VITE_API_URL}
-ENV VITE_API_BASE_URL=${VITE_API_BASE_URL}
-ENV VITE_BACKEND_URL=${VITE_BACKEND_URL}
-ENV NODE_ENV=${NODE_ENV}
-
-# Copy package files
-COPY ai-tutor-app/tutorverse-hub-main/package.json ./
-COPY ai-tutor-app/tutorverse-hub-main/package-lock.json ./
-
-# Install dependencies
-RUN npm install --legacy-peer-deps --no-audit
-
-# Copy source code
-COPY ai-tutor-app/tutorverse-hub-main/src ./src
-COPY ai-tutor-app/tutorverse-hub-main/public ./public
-COPY ai-tutor-app/tutorverse-hub-main/index.html ./
-COPY ai-tutor-app/tutorverse-hub-main/vite.config.ts ./
-COPY ai-tutor-app/tutorverse-hub-main/tsconfig*.json ./
-COPY ai-tutor-app/tutorverse-hub-main/tailwind.config.ts ./
-COPY ai-tutor-app/tutorverse-hub-main/postcss.config.js ./
-COPY ai-tutor-app/tutorverse-hub-main/components.json ./
-COPY ai-tutor-app/tutorverse-hub-main/eslint.config.js ./
-
-# Build with Vite environment variables
-RUN npx vite build
-
 # Production stage
 FROM nginx:alpine
 
 WORKDIR /app
 
-# Copy built app from builder
-COPY --from=builder /app/dist ./dist
+# Copy pre-built dist folder directly
+COPY ai-tutor-app/tutorverse-hub-main/dist ./dist
 
 # Copy dynamic entrypoint script
 COPY docker-entrypoint.sh /docker-entrypoint.sh
