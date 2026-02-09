@@ -67,9 +67,8 @@ services:
      healthCheckStartPeriod: 30
      envVars:
        - key: BACKEND_URL
-         # IMPORTANT: Replace with actual Backend service URL after deployment
-         # Format: https://tutorverse-backend.onrender.com
-         value: https://tutorverse-backend-kpls.onrender.com
+         # Must be HTTP for internal Render communication (no SSL verification needed)
+         value: http://tutorverse-backend-kpls.onrender.com
          sync: false
        - key: NODE_ENV
          value: production

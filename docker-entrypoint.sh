@@ -2,8 +2,17 @@
 # Dynamic Nginx configuration for Render deployment
 # Substitutes environment variables at runtime
 
-# Default backend URL if not provided
-BACKEND_URL=${BACKEND_URL:-http://backend:3000}
+# Backend URL - use env var if provided, otherwise default
+# On Render, set BACKEND_URL to the backend service URL
+# For local docker-compose, it defaults to http://backend:3000
+if [ -z "$BACKEND_URL" ]; then
+    # Auto-detect if running on Render
+    if [ -n "$RENDER" ]; then
+        BACKEND_URL="http://tutorverse-backend-kpls.onrender.com"
+    else
+        BACKEND_URL="http://backend:3000"
+    fi
+fi
 
 # Create nginx config with environment variable substitution
 cat > /etc/nginx/conf.d/default.conf <<EOF
@@ -34,6 +43,10 @@ server {
         proxy_request_buffering off;
         proxy_buffering off;
         proxy_redirect off;
+        
+        # Disable SSL verification for upstream (if using HTTPS)
+        proxy_ssl_verify off;
+        proxy_ssl_verify_depth 0;
         
         # Increase timeout for large uploads
         proxy_connect_timeout 60s;
