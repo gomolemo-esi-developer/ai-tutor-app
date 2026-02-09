@@ -38,6 +38,8 @@ export class S3Service {
         expiresIn: expirySeconds,
       });
       
+      const originalUrl = url;
+      
       // Convert path-style to virtual-hosted style if using path-style
       if (url.includes('s3.amazonaws.com/') && !url.includes('.s3.')) {
         const region = EnvConfig.get('AWS_REGION');
@@ -52,7 +54,7 @@ export class S3Service {
         }
       }
 
-      LoggerUtil.debug('Generated upload URL', { key, expiresIn: expirySeconds, url });
+      LoggerUtil.info('Generated upload URL', { key, originalUrl, convertedUrl: url, isConverted: url !== originalUrl });
       return url;
     } catch (error) {
       LoggerUtil.error('Failed to generate upload URL', error as Error);
@@ -81,6 +83,8 @@ export class S3Service {
         expiresIn: expirySeconds,
       });
       
+      const originalUrl = url;
+      
       // Convert path-style to virtual-hosted style if using path-style
       if (url.includes('s3.amazonaws.com/') && !url.includes('.s3.')) {
         const region = EnvConfig.get('AWS_REGION');
@@ -95,7 +99,7 @@ export class S3Service {
         }
       }
 
-      LoggerUtil.debug('Generated download URL', { key, expiresIn: expirySeconds, fileName, url });
+      LoggerUtil.info('Generated download URL', { key, fileName, originalUrl, convertedUrl: url, isConverted: url !== originalUrl });
       return url;
     } catch (error) {
       LoggerUtil.error('Failed to generate download URL', error as Error);
