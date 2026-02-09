@@ -18,9 +18,8 @@ ENV NODE_ENV=${NODE_ENV}
 COPY ai-tutor-app/tutorverse-hub-main/package.json ./
 COPY ai-tutor-app/tutorverse-hub-main/package-lock.json ./
 
-# Install dependencies with error handling
-RUN npm install --no-audit && \
-    ls -la node_modules/.bin/vite || (echo "Vite not found!" && exit 1)
+# Install dependencies
+RUN npm install --legacy-peer-deps --no-audit
 
 # Copy source code
 COPY ai-tutor-app/tutorverse-hub-main/src ./src
@@ -34,7 +33,7 @@ COPY ai-tutor-app/tutorverse-hub-main/components.json ./
 COPY ai-tutor-app/tutorverse-hub-main/eslint.config.js ./
 
 # Build with Vite environment variables
-RUN npm run build
+RUN npx vite build
 
 # Production stage
 FROM nginx:alpine
