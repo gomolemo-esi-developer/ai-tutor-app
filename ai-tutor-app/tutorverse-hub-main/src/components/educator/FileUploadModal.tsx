@@ -287,16 +287,11 @@ export const FileUploadModal: React.FC<FileUploadModalProps> = ({
                         )
                     );
 
-                    // Get presigned URL
+                    // Generate file ID for the upload
                     const moduleCodeToUse = providedModuleCode || '';
-                    const linkResponse = await EducatorService.getUploadLink(
-                        uf.file.name,
-                        uf.file.size,
-                        uf.file.type,
-                        moduleCodeToUse
-                    );
+                    const fileId = `file_${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
 
-                    // Update progress to 20% (link obtained)
+                    // Update progress to 20% (preparing upload)
                     setUploadFiles((prev) =>
                         prev.map((f) =>
                             f.id === uf.id
@@ -305,14 +300,14 @@ export const FileUploadModal: React.FC<FileUploadModalProps> = ({
                         )
                     );
 
-                    // Upload to S3 with progress tracking
+                    // Upload through backend proxy to bypass CORS
                     await new Promise<void>((resolve, reject) => {
                         const xhr = new XMLHttpRequest();
 
                         // Track upload progress
                         xhr.upload.addEventListener('progress', (e) => {
                             if (e.lengthComputable) {
-                                // Progress from 20% to 70% during S3 upload
+                                // Progress from 20% to 70% during upload
                                 const uploadProgress = (e.loaded / e.total) * 50; // 0-50%
                                 const totalProgress = 20 + uploadProgress;
                                 setUploadFiles((prev) =>
@@ -327,7 +322,7 @@ export const FileUploadModal: React.FC<FileUploadModalProps> = ({
 
                         xhr.addEventListener('load', () => {
                             if (xhr.status >= 200 && xhr.status < 300) {
-                                // S3 upload complete, now processing
+                                // Upload complete
                                 setUploadFiles((prev) =>
                                     prev.map((f) =>
                                         f.id === uf.id
@@ -337,18 +332,29 @@ export const FileUploadModal: React.FC<FileUploadModalProps> = ({
                                 );
                                 resolve();
                             } else {
-                                reject(new Error(`S3 upload failed with status ${xhr.status}`));
+                                reject(new Error(`Upload failed with status ${xhr.status}: ${xhr.responseText}`));
                             }
                         });
 
                         xhr.addEventListener('error', () => {
-                            reject(new Error('S3 upload failed'));
+                            reject(new Error('Upload failed'));
                         });
 
-                        xhr.open('PUT', linkResponse.uploadUrl);
-                        xhr.setRequestHeader('Content-Type', uf.file.type);
+                        // Use backend proxy endpoint
+                        xhr.open('POST', '/api/educator/files/upload');
+                        xhr.setRequestHeader('Content-Type', 'application/octet-stream');
+                        xhr.setRequestHeader('X-File-ID', fileId);
+                        xhr.setRequestHeader('X-Module-Code', moduleCodeToUse);
+                        xhr.setRequestHeader('X-File-Name', uf.file.name);
                         xhr.send(uf.file);
                     });
+
+                    // Prepare linkResponse-like object for metadata save
+                    const linkResponse = {
+                        fileId,
+                        uploadUrl: '', // Not used anymore
+                        s3Key: `modules/${moduleCodeToUse}/${fileId}/${uf.file.name}`
+                    };
 
                     // Update progress to 85% (processing started)
                     setUploadFiles((prev) =>

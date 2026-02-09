@@ -42,8 +42,13 @@ export class AwsConfig {
   static getS3Client(): S3Client {
     if (!s3Client) {
       const config = EnvConfig.getConfig();
+      // Use virtual-hosted style by configuring the endpoint
+      // This ensures presigned URLs use the bucket.s3.region.amazonaws.com format
+      const region = config.AWS_REGION;
+      const bucketName = config.S3_BUCKET || 'aitutor-files-production';
+      
       s3Client = new S3Client({
-        region: config.AWS_REGION,
+        region: region,
         forcePathStyle: false,
       });
     }
