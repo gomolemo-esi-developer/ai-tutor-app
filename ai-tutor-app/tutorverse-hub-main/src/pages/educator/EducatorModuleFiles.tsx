@@ -30,6 +30,7 @@ import { FileUploadModal } from '@/components/educator/FileUploadModal';
 import { ChunksViewer } from '@/components/educator/ChunksViewer';
 import { useAuth } from '@/contexts/AuthContext';
 import { useApi } from '@/hooks/useApi';
+import { createGlobalApiClient } from '@/services/apiClient';
 
 interface SharedFile {
   id: string;
@@ -247,8 +248,11 @@ const EducatorModuleFiles: React.FC = () => {
   const handleDownload = async (file: SharedFile) => {
     const toastId = toast.loading(`Downloading ${file.name}...`);
     try {
-      // Get presigned download URL from backend
-      const response = await fetch(`/api/educator/files/${file.id}/download`, {
+      const apiClient = createGlobalApiClient();
+      const baseURL = apiClient.getBaseURL();
+      
+      // Get presigned download URL from backend using absolute URL to bypass Nginx
+      const response = await fetch(`${baseURL}/api/educator/files/${file.id}/download`, {
         headers: {
           'Authorization': `Bearer ${localStorage.getItem('jwt_token')}`,
         },
