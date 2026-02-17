@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback, useRef } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { Search, Filter, ArrowLeft, X, Check, Sparkles, HelpCircle, MessageSquare, FileText, RefreshCw, Download } from 'lucide-react';
 import MainLayout from '@/components/layout/MainLayout';
@@ -40,6 +40,7 @@ const ModuleContent: React.FC = () => {
   const [content, setContent] = useState<any[]>([]);
   const [module, setModule] = useState<any>(null);
   const [isRefreshing, setIsRefreshing] = useState(false);
+  const [isLoadingModule, setIsLoadingModule] = useState(true);
   const [filters, setFilters] = useState({
     display: 'all',
     contentType: [] as string[],
@@ -47,15 +48,10 @@ const ModuleContent: React.FC = () => {
   });
 
   const { get: getModuleContent, loading } = useApi();
+  const hasInitialized = useRef(false);
   
-  useEffect(() => {
-    setSelectedModuleId(moduleCode || null);
-    if (moduleCode) {
-      fetchModuleContent();
-    }
-  }, [moduleCode, setSelectedModuleId]);
-
-  const fetchModuleContent = async () => {
+  const fetchModuleContent = useCallback(async () => {
+    setIsLoadingModule(true);
     try {
       // First, fetch enrolled modules to get the full module object
       const enrolledModules = await StudentService.getStudentModules();
@@ -63,6 +59,8 @@ const ModuleContent: React.FC = () => {
       
       if (!moduleObj) {
         toast.error('Module not found');
+        setModule(null);
+        setIsLoadingModule(false);
         return;
       }
       
@@ -123,8 +121,37 @@ const ModuleContent: React.FC = () => {
       setModule(mockModule);
       const mockModuleContent = mockContent.filter((c) => c.moduleCode === moduleCode);
       setContent(mockModuleContent);
+    } finally {
+      setIsLoadingModule(false);
     }
-  };
+  }, [moduleCode, getModuleContent]);
+
+  useEffect(() => {
+    // Reset initialization flag when module code changes
+    hasInitialized.current = false;
+  }, [moduleCode]);
+
+  useEffect(() => {
+    // Set module ID when module code changes
+    if (moduleCode) {
+      setSelectedModuleId(moduleCode);
+    }
+  }, [moduleCode, setSelectedModuleId]);
+
+  useEffect(() => {
+    // Only fetch once per module code
+    if (!hasInitialized.current && moduleCode) {
+      hasInitialized.current = true;
+      fetchModuleContent();
+    }
+  }, [moduleCode, fetchModuleContent]);
+
+  useEffect(() => {
+    // Clear selection when leaving the module content page (on unmount)
+    return () => {
+      clearSelection();
+    };
+  }, []);
 
   const filteredContent = content.filter((item) => {
     // Defensive checks for required properties
@@ -249,21 +276,21 @@ const ModuleContent: React.FC = () => {
     { icon: FileText, label: 'Summary', description: 'Summarize content', action: 'summary', color: 'text-warning' },
   ];
 
-  if (!module) {
+  if (isLoadingModule) {
     return (
       <MainLayout>
         <div className="flex-1 flex items-center justify-center">
-          <p className="text-muted-foreground">Module not found</p>
+          <LoadingSpinner message="Loading module content..." />
         </div>
       </MainLayout>
     );
   }
 
-  if (loading) {
+  if (!module) {
     return (
       <MainLayout>
         <div className="flex-1 flex items-center justify-center">
-          <LoadingSpinner message="Loading module content..." />
+          <p className="text-muted-foreground">Module not found</p>
         </div>
       </MainLayout>
     );

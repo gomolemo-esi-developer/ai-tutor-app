@@ -250,7 +250,7 @@ export async function handleSendMessage(event: APIGatewayProxyEvent): Promise<AP
       }
     }
 
-    // Priority 2: Fallback to module description if no specific content selected
+    // Priority 2: Use all module content if no specific content selected
     if (!context && session.moduleId) {
       LoggerUtil.info('No specific content selected, using module context', {
         sessionId,
@@ -259,7 +259,36 @@ export async function handleSendMessage(event: APIGatewayProxyEvent): Promise<AP
 
       const module = await DynamoDBService.get(tables.MODULES, { moduleId: session.moduleId });
       if (module) {
-        context = module.description || '';
+        context = `Module: ${module.moduleName}\n${module.description || ''}\n\nModule Contents:\n`;
+        
+        try {
+          const { items: moduleFiles } = await DynamoDBService.query(
+            tables.FILES,
+            'moduleId = :moduleId',
+            { ':moduleId': session.moduleId },
+            { indexName: 'moduleId-index' }
+          );
+          
+          if (moduleFiles && moduleFiles.length > 0) {
+            for (const file of moduleFiles) {
+              context += `\n- ${file.title || file.fileName}\n`;
+              if (file.description) {
+                context += `  Description: ${file.description}\n`;
+              }
+              if (file.ragDocumentId) {
+                contextSources.push({
+                  id: file.fileId,
+                  name: file.title || file.fileName,
+                  type: file.fileType,
+                  ragDocumentId: file.ragDocumentId
+                });
+              }
+            }
+          }
+        } catch (fileError) {
+          LoggerUtil.warn('Failed to fetch module files', { moduleId: session.moduleId, error: fileError });
+        }
+        
         contextSources.push({
           id: session.moduleId,
           name: module.moduleName,
@@ -294,25 +323,27 @@ export async function handleSendMessage(event: APIGatewayProxyEvent): Promise<AP
 
     if (ragService.isEnabled()) {
       try {
-        // Get RAG document IDs from context sources (selected content) if available
+        // Get RAG document IDs - check if files have explicit ragDocumentId, else use module query
         let ragDocumentIds: string[] = [];
         
-        if (contextSources.length > 0) {
-          // Use only the RAG document IDs from selected content
-          ragDocumentIds = contextSources
-            .filter((source) => source.ragDocumentId)
-            .map((source) => source.ragDocumentId);
-          
+        // First try to get IDs from contextSources (for specific selected content)
+        const contextRagIds = contextSources
+          .filter((source) => source.ragDocumentId)
+          .map((source) => source.ragDocumentId);
+        
+        if (contextRagIds.length > 0) {
+          ragDocumentIds = contextRagIds;
           LoggerUtil.info('[RAG] Using document IDs from selected content', {
             contentCount: contextSources.length,
             ragDocumentCount: ragDocumentIds.length
           });
         } else {
-          // Fallback: Get all RAG document IDs for student's modules only if no content selected
+          // If no explicit ragDocumentIds found, query for all RAG documents in the module
           ragDocumentIds = await getStudentRagDocumentIds(studentId, session.moduleId);
           
-          LoggerUtil.info('[RAG] Using document IDs from student modules (no content selected)', {
-            ragDocumentCount: ragDocumentIds.length
+          LoggerUtil.info('[RAG] Using document IDs from student modules', {
+            ragDocumentCount: ragDocumentIds.length,
+            moduleId: session.moduleId
           });
         }
 
@@ -628,6 +659,79 @@ export async function handleDeleteSession(event: APIGatewayProxyEvent): Promise<
     LoggerUtil.info('Chat session deleted', { sessionId, studentId });
 
     return ResponseUtil.lambdaResponse(200, ResponseUtil.success({}, 'Chat session deleted'));
+  });
+}
+
+/**
+ * GET /api/file/{fileId} - Get file metadata directly by fileId
+ * FALLBACK for orphaned files that exist in contentIds but not in module enrollment
+ */
+export async function handleGetFileMetadata(event: APIGatewayProxyEvent): Promise<APIGatewayProxyResult> {
+  return LambdaUtil.wrap(async () => {
+    // Get userId from JWT token and lookup student record
+    const userId = event.requestContext?.authorizer?.claims?.sub;
+    const fileId = LambdaUtil.getPathParam(event, 'fileId');
+
+    if (!userId || !fileId) {
+      throw new BadRequestError('User authentication and File ID are required');
+    }
+
+    // Query student by userId to get studentId
+    let studentItems: any[] = [];
+    let { items } = await DynamoDBService.query(
+      tables.STUDENTS,
+      'userId = :userId',
+      { ':userId': userId },
+      { indexName: 'userId-index' }
+    );
+    studentItems = items;
+
+    // If not found by userId, try email lookup (fallback)
+    if ((!studentItems || studentItems.length === 0)) {
+      const email = event.requestContext?.authorizer?.claims?.email;
+      if (email) {
+        LoggerUtil.info('Student not found by userId, trying email lookup', { userId, email });
+        const emailResult = await DynamoDBService.query(
+          tables.STUDENTS,
+          'email = :email',
+          { ':email': email },
+          { indexName: 'email-index' }
+        );
+        studentItems = emailResult.items || [];
+      }
+    }
+
+    if (!studentItems || studentItems.length === 0) {
+      throw new NotFoundError('Student profile not found');
+    }
+
+    const studentId = studentItems[0].studentId;
+    const student = studentItems[0];
+
+    // Get file metadata
+    const file = await DynamoDBService.get(tables.FILES, { fileId });
+    if (!file) {
+      throw new NotFoundError('File not found');
+    }
+
+    // Check if student has access to this file
+    // Access is granted if:
+    // 1. Student is enrolled in the module where the file belongs, OR
+    // 2. File is public/shared
+    if (file.moduleId && student.moduleIds && !student.moduleIds.includes(file.moduleId)) {
+      // Check if file has public access
+      if (file.accessLevel !== 'PUBLIC' && file.accessLevel !== 'SHARED') {
+        throw new ForbiddenError('You do not have access to this file');
+      }
+    }
+
+    LoggerUtil.info('File metadata retrieved', {
+      fileId,
+      studentId,
+      fileName: file.fileName,
+    });
+
+    return ResponseUtil.lambdaResponse(200, ResponseUtil.success(file));
   });
 }
 

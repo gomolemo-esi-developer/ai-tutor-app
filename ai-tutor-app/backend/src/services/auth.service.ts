@@ -218,6 +218,7 @@ export class AuthService {
           firstName: userData.firstName,
           lastName: userData.lastName,
           role: userData.role,
+          profilePictureUrl: userData.profilePictureUrl,
         },
       };
     } catch (error) {

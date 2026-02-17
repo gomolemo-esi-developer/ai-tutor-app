@@ -70,6 +70,12 @@ export const AdminService = {
       const offset = (page - 1) * limit;
       const filesArray = await apiClient.get<any[]>(`/api/admin/files?limit=${limit}&offset=${offset}`);
       
+      // Fetch modules to get module codes
+      const modulesArray = await apiClient.get<any[]>(`/api/admin/modules?limit=1000`);
+      const modulesMap = new Map(
+        (modulesArray || []).map((m: any) => [m.moduleId, m.moduleCode])
+      );
+      
       // apiClient.get() returns the data array directly (not wrapped in response object)
       // Transform DynamoDB files to admin files format
       const files = (filesArray || []).map((file: any) => ({
@@ -79,7 +85,7 @@ export const AdminService = {
         fileName: file.fileName,
         moduleId: file.moduleId,
         moduleName: file.moduleName || 'N/A',
-        moduleCode: file.moduleCode || file.moduleId || 'N/A', // Use moduleCode if available, fallback to moduleId
+        moduleCode: modulesMap.get(file.moduleId) || file.moduleId || 'N/A', // Get moduleCode from modules lookup
         lecturerId: file.lecturerId,
         authorName: file.author || file.createdBy || 'Unknown',
         type: file.fileType,

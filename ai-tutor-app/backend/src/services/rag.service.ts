@@ -244,6 +244,51 @@ export class RAGService {
   }
 
   /**
+   * Generate a descriptive title for a chat based on conversation content
+   */
+  async generateChatTitle(messageText: string, moduleCode?: string): Promise<string> {
+    if (!this.config.isEnabled()) {
+      throw new Error('RAG service not enabled');
+    }
+
+    for (let attempt = 1; attempt <= this.config.retryAttempts; attempt++) {
+      try {
+        LoggerUtil.info(`[RAG] Generating chat title (attempt ${attempt}/${this.config.retryAttempts})`, {
+          moduleCode,
+          messageLength: messageText.length
+        });
+
+        const response = await this.client.post('/student/generate-title', {
+          message: messageText,
+          module: moduleCode
+        });
+
+        const title = response.data?.title || response.data?.success;
+        
+        if (!title) {
+          throw new Error('No title returned from RAG service');
+        }
+
+        LoggerUtil.info('[RAG] Chat title generated', { title });
+        return String(title);
+      } catch (error) {
+        LoggerUtil.warn(`[RAG] Title generation failed (attempt ${attempt}/${this.config.retryAttempts})`, {
+          error: error instanceof Error ? error.message : String(error)
+        });
+
+        if (attempt < this.config.retryAttempts) {
+          const delay = this.config.retryDelayMs * Math.pow(2, attempt - 1);
+          await new Promise(resolve => setTimeout(resolve, delay));
+        } else {
+          throw error;
+        }
+      }
+    }
+
+    throw new Error('RAG title generation failed after all retries');
+  }
+
+  /**
    * Generate quiz from documents
    */
   async generateQuiz(
@@ -336,6 +381,44 @@ export class RAGService {
         error: error instanceof Error ? error.message : String(error)
       });
       throw error;
+    }
+  }
+
+  /**
+   * Delete document from RAG (removes chunks from Chroma DB)
+   */
+  async deleteDocument(documentId: string): Promise<void> {
+    if (!this.config.isEnabled()) {
+      LoggerUtil.warn('[RAG] Service not enabled, skipping delete', { documentId });
+      return;
+    }
+
+    for (let attempt = 1; attempt <= this.config.retryAttempts; attempt++) {
+      try {
+        LoggerUtil.info(`[RAG] Delete document attempt ${attempt}/${this.config.retryAttempts}`, {
+          documentId
+        });
+
+        await this.client.delete(`/educator/documents/${documentId}`);
+
+        LoggerUtil.info('[RAG] Document deleted from RAG', { documentId });
+        return;
+      } catch (error) {
+        LoggerUtil.warn(`[RAG] Delete document failed (attempt ${attempt}/${this.config.retryAttempts})`, {
+          documentId,
+          error: error instanceof Error ? error.message : String(error)
+        });
+
+        if (attempt < this.config.retryAttempts) {
+          const delay = this.config.retryDelayMs * Math.pow(2, attempt - 1);
+          await new Promise(resolve => setTimeout(resolve, delay));
+        } else {
+          LoggerUtil.error('[RAG] Failed to delete document after all retries', {
+            documentId,
+            error: error instanceof Error ? error.message : String(error)
+          });
+        }
+      }
     }
   }
 

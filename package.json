@@ -1,0 +1,12 @@
+{
+  "name": "ai-tutor-cleanup",
+  "version": "1.0.0",
+  "description": "Cleanup script for AI Tutor files",
+  "main": "cleanup-files.js",
+  "scripts": {
+    "cleanup": "node cleanup-files.js"
+  },
+  "dependencies": {
+    "aws-sdk": "^2.1632.0"
+  }
+}

@@ -7,6 +7,7 @@
 
 import { APIGatewayProxyEvent, APIGatewayProxyResult } from 'aws-lambda';
 import { DynamoDBService } from '../../services/dynamodb.service';
+import { S3Service } from '../../services/s3.service';
 import { DatabaseConfig } from '../../config/database.config';
 import {
   createFileMetadataSchema,
@@ -297,13 +298,24 @@ export async function handleDeleteFile(
       throw new NotFoundError('File not found');
     }
 
-    // Soft delete
-    await DynamoDBService.update(tables.FILES, { fileId }, {
-      status: 'DELETED',
-      updatedAt: Date.now(),
-    });
+    // Hard delete: remove from S3 and DynamoDB
+    if (file.s3Key) {
+      try {
+        await S3Service.deleteFile(file.s3Key);
+        LoggerUtil.info('File deleted from S3', { fileId, s3Key: file.s3Key });
+      } catch (s3Error) {
+        LoggerUtil.warn('Failed to delete file from S3', { 
+          fileId, 
+          s3Key: file.s3Key, 
+          error: s3Error instanceof Error ? s3Error.message : String(s3Error) 
+        });
+      }
+    }
 
-    LoggerUtil.info('File deleted', { fileId });
+    // Delete metadata from DynamoDB
+    await DynamoDBService.delete(tables.FILES, { fileId });
+
+    LoggerUtil.info('File hard deleted', { fileId });
 
     return ResponseUtil.lambdaResponse(
       200,

@@ -1,9 +1,9 @@
 /**
  * Educator Profile Handler
- * GET /api/educator/profile - Get educator profile (name, staff number, campus, department, title)
+ * GET /api/educator/profile - Get educator profile (name, staff number, campus, department, title, profile picture)
  *
  * Frontend: /profile route (Personal Information Card + Academic Information Card)
- * Response Format: firstName, lastName, staffNumber, email, title, campusName, departmentName, assignedModulesCount
+ * Response Format: firstName, lastName, staffNumber, email, title, campusName, departmentName, assignedModulesCount, profilePictureUrl
  */
 
 import { APIGatewayProxyEvent, APIGatewayProxyResult } from 'aws-lambda';
@@ -83,6 +83,13 @@ export async function handleGetEducatorProfile(
     );
     const departmentName = department?.departmentName || 'Unknown';
 
+    // Get profile picture URL from users table
+    const user = await DynamoDBService.get(
+      tables.USERS,
+      { userId }
+    );
+    const profilePictureUrl = user?.profilePictureUrl;
+
     // Build response with exact field names from schema
     const response = {
       firstName: educator.firstName,
@@ -93,11 +100,15 @@ export async function handleGetEducatorProfile(
       campusName: campusName,
       departmentName: departmentName,
       assignedModulesCount: educator.moduleIds?.length || 0,
+      profilePictureUrl: profilePictureUrl || undefined, // Profile picture URL from users table
     };
 
-    // Remove undefined title if not present
+    // Remove undefined fields
     if (!response.title) {
       delete response.title;
+    }
+    if (!response.profilePictureUrl) {
+      delete response.profilePictureUrl;
     }
 
     LoggerUtil.info('Educator profile retrieved', {

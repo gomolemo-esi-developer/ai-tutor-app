@@ -22,7 +22,8 @@ export const QuickLoginModal: React.FC<QuickLoginModalProps> = ({
     isLoading = false,
 }) => {
     const isEducator = role === 'educator';
-    const defaultValue = isEducator ? 'L004' : 'S006';
+    const isAdmin = role === 'admin';
+    const defaultValue = isAdmin ? 'admin@university.edu' : isEducator ? 'L004' : 'S006';
     
     const [registrationNumber, setRegistrationNumber] = useState(defaultValue);
 
@@ -44,9 +45,11 @@ export const QuickLoginModal: React.FC<QuickLoginModalProps> = ({
         onClose();
     };
 
-    const placeholder = isEducator ? 'E001' : 'S001';
-    const label = isEducator ? 'Staff Number' : 'Student Number';
-    const description = isEducator
+    const placeholder = isAdmin ? 'admin@university.edu' : isEducator ? 'E001' : 'S001';
+    const label = isAdmin ? 'Email' : isEducator ? 'Staff Number' : 'Student Number';
+    const description = isAdmin
+        ? 'Enter your admin email to access your account'
+        : isEducator
         ? 'Enter your staff number to access your account'
         : 'Enter your student number to access your account';
 

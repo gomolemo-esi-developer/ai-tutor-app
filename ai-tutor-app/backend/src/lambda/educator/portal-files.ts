@@ -500,7 +500,7 @@ export async function handleDeleteFile(
       throw new BadRequestError('fileId is required');
     }
 
-    LoggerUtil.info('Deleting file', { userId, fileId });
+    LoggerUtil.info('Hard deleting file', { userId, fileId });
 
     // Get the file
     const file = (await DynamoDBService.get(tables.FILES, { fileId })) as File | null;
@@ -528,14 +528,44 @@ export async function handleDeleteFile(
       throw new ForbiddenError('You do not have permission to delete this file');
     }
 
-    // Soft delete: mark as DELETED instead of removing
-    await DynamoDBService.update(
-      tables.FILES,
-      { fileId },
-      { status: 'DELETED', updatedAt: Date.now() }
-    );
+    // Hard delete: remove from S3 and DynamoDB
+    if (file.s3Key) {
+      try {
+        await S3Service.deleteFile(file.s3Key);
+        LoggerUtil.info('File deleted from S3', { fileId, s3Key: file.s3Key });
+      } catch (s3Error) {
+        LoggerUtil.warn('Failed to delete file from S3', { 
+          fileId, 
+          s3Key: file.s3Key, 
+          error: s3Error instanceof Error ? s3Error.message : String(s3Error) 
+        });
+      }
+    }
 
-    LoggerUtil.info('File deleted', { userId, fileId });
+    // Delete RAG document and chunks if it exists
+    if (file.ragDocumentId) {
+      try {
+        const ragService = getRagService();
+        if (ragService.isEnabled()) {
+          await ragService.deleteDocument(file.ragDocumentId);
+          LoggerUtil.info('RAG document and chunks deleted', { 
+            fileId, 
+            ragDocumentId: file.ragDocumentId 
+          });
+        }
+      } catch (ragError) {
+        LoggerUtil.warn('Error deleting RAG document', { 
+          fileId, 
+          ragDocumentId: file.ragDocumentId,
+          error: ragError instanceof Error ? ragError.message : String(ragError) 
+        });
+      }
+    }
+
+    // Delete metadata from DynamoDB
+    await DynamoDBService.delete(tables.FILES, { fileId });
+
+    LoggerUtil.info('File hard deleted', { userId, fileId });
 
     return ResponseUtil.lambdaResponse(
       200,

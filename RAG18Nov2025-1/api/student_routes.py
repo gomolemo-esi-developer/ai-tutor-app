@@ -32,6 +32,10 @@ class SearchRequest(BaseModel):
     top_k: int = 5
     module_code: Optional[str] = None
 
+class TitleGenerationRequest(BaseModel):
+    message: str
+    module: Optional[str] = None
+
 
 @router.post("/chat")
 async def chat(request: ChatRequest):
@@ -293,6 +297,69 @@ async def search_across_student_modules(request: SearchRequest):
     except Exception as e:
         logger.error(f"Error searching modules: {e}")
         raise HTTPException(status_code=500, detail=str(e))
+
+
+@router.post("/generate-title")
+async def generate_title(request: TitleGenerationRequest):
+    """
+    Generate an intelligent title for a chat message using AI.
+    
+    Uses the LLM to create concise, descriptive titles for chat sessions.
+    Provides AI-powered title generation that understands context.
+    """
+    try:
+        if not request.message or len(request.message.strip()) == 0:
+            raise HTTPException(status_code=400, detail="Message cannot be empty")
+        
+        from modules.content_processing.llm_client import call_llm
+        
+        system_prompt = """You are a title generator for educational chat sessions.
+Generate a concise, descriptive title (max 50 characters) for the following question or topic.
+Focus on the main topic/concept being asked about.
+Do not include question marks, punctuation, or formal greeting phrases.
+Provide ONLY the title, nothing else.
+
+Examples:
+- Input: "Explain React hooks" → Output: "React hooks"
+- Input: "What is state management?" → Output: "State management"
+- Input: "How do async/await work?" → Output: "Async/await"
+- Input: "Tell me about closures" → Output: "Closures"
+"""
+        
+        messages = [{"role": "user", "content": request.message}]
+        
+        logger.info(f"🎯 Generating AI title for message: {request.message[:50]}...")
+        
+        title = call_llm(
+            system_prompt=system_prompt,
+            messages=messages,
+            temperature=0.3,
+            max_tokens=50
+        )
+        
+        # Clean up the response
+        title = title.strip().strip('"').strip()
+        
+        # Ensure title isn't empty
+        if not title:
+            raise ValueError("LLM returned empty title")
+        
+        # Format with module if provided
+        if request.module:
+            title = f"{request.module} • {title}"
+        
+        logger.info(f"✅ Generated title: {title}")
+        
+        return {
+            "success": True,
+            "title": title
+        }
+        
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"❌ Title generation error: {e}")
+        raise HTTPException(status_code=500, detail=f"Failed to generate title: {str(e)}")
 
 
 @router.get("/stats")

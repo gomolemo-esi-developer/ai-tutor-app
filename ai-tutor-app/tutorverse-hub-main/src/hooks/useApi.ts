@@ -26,6 +26,9 @@ interface UseApiReturn<T = any> {
   del: (endpoint: string) => Promise<boolean>;
 }
 
+// Map to track in-flight requests and prevent duplicates
+const requestCache = new Map<string, Promise<any>>();
+
 export const useApi = <T = any>(): UseApiReturn<T> => {
   const { user, token } = useAuth();
   const [data, setData] = useState<T | null>(null);
@@ -60,36 +63,57 @@ export const useApi = <T = any>(): UseApiReturn<T> => {
       method: 'GET' | 'POST' | 'PUT' | 'DELETE',
       body?: Record<string, unknown>
     ) => {
-      setLoading(true);
-      setError(null);
-      try {
-        console.log(`📡 [${method}] Requesting: ${endpoint}`, {
-          hasToken: !!token,
-          baseURL: apiClient.getToken ? 'client ready' : 'no client',
-        });
-
-        let response: T | null = null;
-
-        if (method === 'GET') {
-          response = await apiClient.get<T>(endpoint);
-        } else if (method === 'POST') {
-          response = await apiClient.post<T>(endpoint, body);
-        } else if (method === 'PUT') {
-          response = await apiClient.put<T>(endpoint, body);
-        } else if (method === 'DELETE') {
-          response = await apiClient.delete<T>(endpoint);
-        }
-
-        setData(response || null);
-        return response || null;
-      } catch (err) {
-        const errorMessage = err instanceof Error ? err.message : 'Unknown error';
-        setError(errorMessage);
-        console.error(`API Error [${method} ${endpoint}]:`, errorMessage);
-        return null;
-      } finally {
-        setLoading(false);
+      const cacheKey = `${method}:${endpoint}`;
+      
+      // For GET requests, return cached promise if in-flight to deduplicate
+      if (method === 'GET' && requestCache.has(cacheKey)) {
+        console.log(`⚡ Returning cached request for: ${endpoint}`);
+        return await requestCache.get(cacheKey);
       }
+
+      // Create the request promise
+      const requestPromise = (async () => {
+        setLoading(true);
+        setError(null);
+        
+        try {
+          console.log(`📡 [${method}] Requesting: ${endpoint}`, {
+            hasToken: !!token,
+            baseURL: apiClient.getToken ? 'client ready' : 'no client',
+          });
+
+          let response: T | null = null;
+
+          if (method === 'GET') {
+            response = await apiClient.get<T>(endpoint);
+          } else if (method === 'POST') {
+            response = await apiClient.post<T>(endpoint, body);
+          } else if (method === 'PUT') {
+            response = await apiClient.put<T>(endpoint, body);
+          } else if (method === 'DELETE') {
+            response = await apiClient.delete<T>(endpoint);
+          }
+
+          setData(response || null);
+          return response || null;
+        } catch (err) {
+          const errorMessage = err instanceof Error ? err.message : 'Unknown error';
+          setError(errorMessage);
+          console.error(`API Error [${method} ${endpoint}]:`, errorMessage);
+          return null;
+        } finally {
+          setLoading(false);
+          // Clear cache entry after request completes
+          requestCache.delete(cacheKey);
+        }
+      })();
+
+      // Cache GET requests
+      if (method === 'GET') {
+        requestCache.set(cacheKey, requestPromise);
+      }
+
+      return await requestPromise;
     },
     [apiClient, token]
   );

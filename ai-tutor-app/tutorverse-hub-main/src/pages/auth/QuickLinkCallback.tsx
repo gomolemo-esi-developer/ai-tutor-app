@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useState, useRef } from 'react';
 import { useSearchParams, useNavigate } from 'react-router-dom';
 import { Loader2, AlertCircle, CheckCircle2 } from 'lucide-react';
 import { apiClient } from '@/lib/api';
@@ -19,6 +19,7 @@ interface AuthResponse {
 export default function QuickLinkCallback() {
   const [searchParams] = useSearchParams();
   const navigate = useNavigate();
+  const processedRef = useRef(false);
   const [state, setState] = useState<{
     loading: boolean;
     error: string | null;
@@ -30,6 +31,10 @@ export default function QuickLinkCallback() {
   });
 
   useEffect(() => {
+    // Prevent processing multiple times
+    if (processedRef.current) return;
+    processedRef.current = true;
+
     const authenticateWithQuickLink = async () => {
       try {
         const token = searchParams.get('token');
@@ -40,13 +45,13 @@ export default function QuickLinkCallback() {
         }
 
         // Validate quick link token
-         setState(prev => ({ ...prev, stage: 'validating' }));
-         
-         const result = await apiClient.get<AuthResponse>(
-           `/api/auth/quick?token=${encodeURIComponent(token)}&email=${encodeURIComponent(email)}`
-         );
+        setState(prev => ({ ...prev, stage: 'validating' }));
+        
+        const result = await apiClient.get<AuthResponse>(
+          `/api/auth/quick?token=${encodeURIComponent(token)}&email=${encodeURIComponent(email)}`
+        );
 
-         const data: AuthResponse = result;
+        const data: AuthResponse = result;
 
         // Store tokens and user
         setState(prev => ({ ...prev, stage: 'storing' }));
@@ -55,20 +60,8 @@ export default function QuickLinkCallback() {
         localStorage.setItem('refresh_token', data.refreshToken);
         localStorage.setItem('user', JSON.stringify(data.user));
 
-        // Mark complete
-        setState(prev => ({ ...prev, stage: 'complete' }));
-
-        // Redirect based on role
-        const redirectUrl = {
-          'STUDENT': '/modules',
-          'EDUCATOR': '/files',
-          'ADMIN': '/admin/lecturers',
-        }[data.user.role] || '/modules';
-
-        // Brief delay for visual feedback
-        setTimeout(() => {
-          window.location.href = redirectUrl;
-        }, 500);
+        // Full page reload - cleanest way to reinitialize auth context from localStorage
+        window.location.href = '/';
       } catch (err) {
         setState({
           loading: false,
@@ -79,7 +72,7 @@ export default function QuickLinkCallback() {
     };
 
     authenticateWithQuickLink();
-  }, [searchParams, navigate]);
+  }, []);
 
   // Loading State
   if (state.loading) {

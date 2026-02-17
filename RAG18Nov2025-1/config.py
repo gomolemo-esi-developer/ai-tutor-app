@@ -14,7 +14,7 @@ CHROMA_COLLECTION_NAME = os.getenv("CHROMA_COLLECTION_NAME", "tut_documents")
 CHUNK_SIZE = int(os.getenv("CHUNK_SIZE", "1000"))
 CHUNK_OVERLAP = int(os.getenv("CHUNK_OVERLAP", "200"))
 EMBEDDING_MODEL = os.getenv("EMBEDDING_MODEL", "text-embedding-3-small")
-RETRIEVAL_TOP_K = int(os.getenv("RETRIEVAL_TOP_K", "15"))
+RETRIEVAL_TOP_K = int(os.getenv("RETRIEVAL_TOP_K", "30"))  # Increased from 15 to 30 for more context
 
 # LLM Model Options:
 # GPT-5 Series:

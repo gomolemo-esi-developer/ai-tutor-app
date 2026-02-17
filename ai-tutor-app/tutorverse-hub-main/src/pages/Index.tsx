@@ -4,20 +4,30 @@ import { useAuth } from '@/contexts/AuthContext';
 
 const Index: React.FC = () => {
   const navigate = useNavigate();
-  const { isAuthenticated, user } = useAuth();
+  const { isAuthenticated, user, loading } = useAuth();
 
   useEffect(() => {
+    // Wait for auth to load
+    if (loading) return;
+
+    console.log('Index.tsx - Auth state:', { isAuthenticated, user, loading });
+
     if (isAuthenticated && user) {
       // Normalize role for comparison (backward compatible)
-      if ((user.role || '').toUpperCase() === 'ADMIN') {
+      const role = (user.role || '').toUpperCase();
+      console.log('Redirecting to:', { role });
+      if (role === 'ADMIN' || role === 'SUPER_ADMIN') {
         navigate('/admin/lecturers');
+      } else if (role === 'EDUCATOR') {
+        navigate('/files');
       } else {
         navigate('/modules');
       }
     } else {
+      console.log('Not authenticated, redirecting to /auth');
       navigate('/auth');
     }
-  }, [isAuthenticated, user, navigate]);
+  }, [isAuthenticated, user, loading, navigate]);
 
   return null;
 };

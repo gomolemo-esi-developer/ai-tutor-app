@@ -30,9 +30,13 @@ def query_with_filter(
         
         filter_dict = create_document_filter(document_ids)
         
+        # Retrieve MORE chunks than needed to ensure coverage across all documents
+        # Use a larger multiplier to guarantee representation from every document type
+        extended_k = max(top_k * 10, 100)  # Retrieve up to 100 chunks
+        
         results = collection.query(
             query_embeddings=[query_embedding],
-            n_results=top_k,
+            n_results=extended_k,
             where=filter_dict,
             include=["documents", "metadatas", "distances"]
         )
@@ -48,7 +52,7 @@ def query_with_filter(
                 match['metadata']['text'] = results['documents'][0][i]
                 matches.append(match)
         
-        logger.info(f"Retrieved {len(matches)} matches from ChromaDB")
+        logger.info(f"Retrieved {len(matches)} matches from ChromaDB (extended search: {extended_k} chunks)")
         return matches
         
     except Exception as e:

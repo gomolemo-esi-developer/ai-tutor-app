@@ -3,7 +3,7 @@ import { User, GraduationCap, Building2, BookOpen, Mail, Hash, MapPin } from 'lu
 import MainLayout from '@/components/layout/MainLayout';
 import { Card } from '@/components/ui/card';
 import { useAuth } from '@/contexts/AuthContext';
-
+import ProfilePictureUpload from '@/components/profile/ProfilePictureUpload';
 import { Badge } from '@/components/ui/badge';
 import LoadingSpinner from '@/components/ui/loading-spinner';
 import { useApi } from '@/hooks/useApi';
@@ -23,6 +23,7 @@ interface ProfileData {
   enrollmentYear?: number;
   educationLevel?: string;
   academicLevel?: number;
+  profilePictureUrl?: string;
 }
 
 interface ModuleHierarchy {
@@ -82,6 +83,7 @@ const Profile: React.FC = () => {
        
        const profileInfo = await getProfile(endpoint);
        console.log('Profile data fetched from API:', profileInfo);
+       console.log('Profile picture URL:', profileInfo?.profilePictureUrl);
        setProfileData(profileInfo);
        
        // Fetch modules for this user
@@ -160,10 +162,30 @@ const Profile: React.FC = () => {
 
           {/* Profile Header */}
           <div className="flex flex-col sm:flex-row items-center sm:items-start gap-4 md:gap-6 mb-6 md:mb-8">
-            <div className="w-20 h-20 md:w-24 md:h-24 rounded-full bg-primary/20 flex items-center justify-center">
-              <span className="text-2xl md:text-3xl font-bold text-primary">
-                {profileInfo.fullName.charAt(0)}
-              </span>
+            <div className="relative">
+              <div className="w-20 h-20 md:w-24 md:h-24 rounded-full bg-primary/20 flex items-center justify-center overflow-hidden">
+                {profileData?.profilePictureUrl ? (
+                  <img
+                    src={profileData.profilePictureUrl}
+                    alt={profileInfo.fullName}
+                    className="w-full h-full object-cover"
+                  />
+                ) : (
+                  <span className="text-2xl md:text-3xl font-bold text-primary">
+                    {profileInfo.fullName.charAt(0)}
+                  </span>
+                )}
+              </div>
+              <div className="absolute bottom-0 right-0">
+                <ProfilePictureUpload
+                    currentImage={profileData?.profilePictureUrl}
+                    onUploadComplete={async () => {
+                      // Wait a moment for the backend to complete all operations
+                      await new Promise(resolve => setTimeout(resolve, 1000));
+                      await fetchProfileData();
+                    }}
+                  />
+              </div>
             </div>
             <div className="text-center sm:text-left">
               <h2 className="text-xl md:text-2xl font-semibold text-foreground">

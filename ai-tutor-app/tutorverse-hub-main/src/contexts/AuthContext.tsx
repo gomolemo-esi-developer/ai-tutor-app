@@ -10,6 +10,7 @@ export interface User {
   role: UserRole;
   firstName?: string;
   lastName?: string;
+  profilePictureUrl?: string;
 }
 
 export interface RegisterData {
@@ -127,6 +128,7 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
             role: (response.user?.role || response.role) as UserRole,
             firstName: response.user?.firstName || response.firstName,
             lastName: response.user?.lastName || response.lastName,
+            profilePictureUrl: response.user?.profilePictureUrl || response.profilePictureUrl,
           };
 
           localStorage.setItem('user', JSON.stringify(userData));

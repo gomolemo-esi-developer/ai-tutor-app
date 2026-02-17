@@ -93,14 +93,16 @@ const AdminFiles: React.FC = () => {
       key: "name",
       label: "File Name",
       render: (item: FileData) => (
-        <span className="font-medium text-foreground">{item.name}</span>
+        <span className="font-medium text-foreground max-w-xs truncate" title={item.name}>
+          {item.name}
+        </span>
       ),
     },
     {
       key: "moduleCode",
-      label: "Module",
+      label: "Modules",
       render: (item: FileData) => (
-        <span className="text-xs font-medium text-primary bg-primary/10 px-2 py-1 rounded">
+        <span className="text-xs font-medium text-primary bg-primary/10 px-2 py-1 rounded max-w-xs truncate" title={item.moduleCode || 'N/A'}>
           {item.moduleCode || 'N/A'}
         </span>
       ),
@@ -109,21 +111,25 @@ const AdminFiles: React.FC = () => {
       key: "authorName",
       label: "Author",
       render: (item: FileData) => (
-        <span className="text-sm text-foreground">{item.authorName || 'N/A'}</span>
+        <span className="text-sm text-foreground max-w-xs truncate" title={item.authorName || 'N/A'}>
+          {item.authorName || 'N/A'}
+        </span>
       ),
     },
     {
       key: "description",
       label: "Description",
       render: (item: FileData) => (
-        <span className="text-sm text-foreground">{item.description || 'N/A'}</span>
+        <span className="text-sm text-foreground max-w-sm truncate" title={item.description || 'N/A'}>
+          {item.description || 'N/A'}
+        </span>
       ),
     },
     {
       key: "contentType",
       label: "Content Type",
       render: (item: FileData) => (
-        <span className="text-xs font-medium text-secondary bg-secondary/10 px-2 py-1 rounded">
+        <span className="text-xs font-medium text-slate-700 bg-slate-200 px-2 py-1 rounded">
           {item.contentType || 'N/A'}
         </span>
       ),

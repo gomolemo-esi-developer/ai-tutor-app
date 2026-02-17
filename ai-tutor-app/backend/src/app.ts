@@ -70,6 +70,12 @@ import { getFileChunks, getFileChunk } from './lambda/educator/chunks';
 // NEW: Authorization middleware
 import { authMiddleware, roleMiddleware } from './middleware/auth.middleware';
 
+// Rate limiting middleware
+import { generalLimiter, authLimiter, chatLimiter, quizLimiter, uploadLimiter } from './middleware/rate-limit.middleware';
+
+// Chat title initialization
+import { initializeChatTitles } from './services/chat-title-init.service';
+
 // Auth handlers
 import { registerHandler, loginHandler, refreshHandler, verifyEmailCodeHandler } from './lambda/auth/handler';
 
@@ -91,7 +97,17 @@ import {
   getQuizHandler,
   submitQuizHandler,
   generateSummaryHandler,
+  getFileMetadataHandler,
+  generateTitleHandler,
+  batchGenerateTitlesHandler,
 } from './lambda/ai/handler';
+
+// NEW: User profile picture handlers
+import {
+  handleGetUploadLink,
+  handleSaveProfilePicture,
+  handleDeleteProfilePicture,
+} from './lambda/user/profile-picture';
 
 // Initialize environment config
 EnvConfig.getConfig();
@@ -106,6 +122,7 @@ app.use(express.urlencoded({ limit: '10mb', extended: true }));
 
 app.use(corsMiddleware);
 app.use(loggerMiddleware);
+app.use(generalLimiter);
 
 /**
  * Lambda-to-Express adapter
@@ -348,6 +365,7 @@ app.post('/api/educator/files/upload',
 app.post('/api/educator/files',
   authMiddleware,
   roleMiddleware(['EDUCATOR']),
+  uploadLimiter,
   adaptLambdaHandler(saveFileMetadataHandler)
 );
 app.get('/api/educator/files',
@@ -385,18 +403,18 @@ app.get('/api/educator/files/:fileId/chunks/:chunkIndex',
 /**
  * API Routes - Auth Endpoints
  */
-app.post('/api/auth/register', adaptLambdaHandler(registerHandler));
-app.post('/api/auth/login', adaptLambdaHandler(loginHandler));
-app.post('/api/auth/refresh', adaptLambdaHandler(refreshHandler));
-app.post('/api/auth/verify-email', adaptLambdaHandler(verifyEmailCodeHandler));
+app.post('/api/auth/register', authLimiter, adaptLambdaHandler(registerHandler));
+app.post('/api/auth/login', authLimiter, adaptLambdaHandler(loginHandler));
+app.post('/api/auth/refresh', authLimiter, adaptLambdaHandler(refreshHandler));
+app.post('/api/auth/verify-email', authLimiter, adaptLambdaHandler(verifyEmailCodeHandler));
 
 /**
  * API Routes - Activation Flow (Pre-created records)
  * For educators/students that were pre-created by admin
  */
-app.post('/api/auth/register-activation', adaptLambdaHandler(registerActivationHandler));
-app.post('/api/auth/verify-activation', adaptLambdaHandler(verifyActivationHandler));
-app.get('/api/auth/check-activation/:staffNumber', adaptLambdaHandler(checkActivationStatusHandler));
+app.post('/api/auth/register-activation', authLimiter, adaptLambdaHandler(registerActivationHandler));
+app.post('/api/auth/verify-activation', authLimiter, adaptLambdaHandler(verifyActivationHandler));
+app.get('/api/auth/check-activation/:staffNumber', authLimiter, adaptLambdaHandler(checkActivationStatusHandler));
 
 /**
  * API Routes - Quick Bypass (No Email)
@@ -404,16 +422,23 @@ app.get('/api/auth/check-activation/:staffNumber', adaptLambdaHandler(checkActiv
  */
 app.post('/api/auth/quick-link-existing', asyncHandler(async (req, res) => {
   try {
-    const { studentNumber, staffNumber, role } = req.body;
+    const { studentNumber, staffNumber, email, role } = req.body;
 
-    if (!role || !['STUDENT', 'EDUCATOR'].includes(role)) {
+    if (!role || !['STUDENT', 'EDUCATOR', 'ADMIN'].includes(role)) {
       return res.status(400).json({ 
         success: false, 
-        error: 'Invalid role. Must be STUDENT or EDUCATOR' 
+        error: 'Invalid role. Must be STUDENT, EDUCATOR, or ADMIN' 
       });
     }
 
-    if (!studentNumber && !staffNumber) {
+    if (role === 'ADMIN' && !email) {
+      return res.status(400).json({
+        success: false,
+        error: 'Email is required for ADMIN role'
+      });
+    }
+
+    if (role !== 'ADMIN' && !studentNumber && !staffNumber) {
       return res.status(400).json({
         success: false,
         error: 'Provide either studentNumber or staffNumber'
@@ -424,7 +449,8 @@ app.post('/api/auth/quick-link-existing', asyncHandler(async (req, res) => {
     const result = await QuickBypassService.generateQuickLinkForExisting(
       studentNumber,
       staffNumber,
-      role as 'STUDENT' | 'EDUCATOR'
+      role as 'STUDENT' | 'EDUCATOR' | 'ADMIN',
+      email
     );
 
     res.json({
@@ -492,32 +518,62 @@ app.get('/api/auth/quick', asyncHandler(async (req, res) => {
 app.post('/api/chat',
   authMiddleware,
   roleMiddleware(['STUDENT']),
+  chatLimiter,
   adaptLambdaHandler(createSessionHandler)
 );
 app.get('/api/chat',
   authMiddleware,
   roleMiddleware(['STUDENT']),
+  chatLimiter,
   adaptLambdaHandler(listSessionsHandler)
 );
 app.get('/api/chat/:sessionId',
   authMiddleware,
   roleMiddleware(['STUDENT']),
+  chatLimiter,
   adaptLambdaHandler(getSessionHandler)
 );
 app.get('/api/chat/:sessionId/messages',
   authMiddleware,
   roleMiddleware(['STUDENT']),
+  chatLimiter,
   adaptLambdaHandler(getMessagesHandler)
 );
 app.post('/api/chat/:sessionId/messages',
   authMiddleware,
   roleMiddleware(['STUDENT']),
+  chatLimiter,
   adaptLambdaHandler(sendMessageHandler)
 );
 app.delete('/api/chat/:sessionId',
   authMiddleware,
   roleMiddleware(['STUDENT']),
+  chatLimiter,
   adaptLambdaHandler(deleteSessionHandler)
+);
+
+app.post('/api/chat/:sessionId/generate-title',
+  authMiddleware,
+  roleMiddleware(['STUDENT']),
+  chatLimiter,
+  adaptLambdaHandler(generateTitleHandler)
+);
+
+app.post('/api/chats/generate-titles',
+  authMiddleware,
+  roleMiddleware(['STUDENT']),
+  chatLimiter,
+  adaptLambdaHandler(batchGenerateTitlesHandler)
+);
+
+/**
+ * File metadata endpoint (fallback for orphaned files)
+ */
+app.get('/api/file/:fileId',
+  authMiddleware,
+  roleMiddleware(['STUDENT']),
+  chatLimiter,
+  adaptLambdaHandler(getFileMetadataHandler)
 );
 
 /**
@@ -526,16 +582,19 @@ app.delete('/api/chat/:sessionId',
 app.post('/api/quiz/generate',
   authMiddleware,
   roleMiddleware(['STUDENT']),
+  quizLimiter,
   adaptLambdaHandler(generateQuizHandler)
 );
 app.get('/api/quiz/:quizId',
   authMiddleware,
   roleMiddleware(['STUDENT']),
+  quizLimiter,
   adaptLambdaHandler(getQuizHandler)
 );
 app.post('/api/quiz/:quizId/submit',
   authMiddleware,
   roleMiddleware(['STUDENT']),
+  quizLimiter,
   adaptLambdaHandler(submitQuizHandler)
 );
 
@@ -545,6 +604,7 @@ app.post('/api/quiz/:quizId/submit',
 app.post('/api/summary/generate',
   authMiddleware,
   roleMiddleware(['STUDENT']),
+  quizLimiter,
   adaptLambdaHandler(generateSummaryHandler)
 );
 
@@ -552,6 +612,25 @@ app.post('/api/summary/generate',
  * DEBUG: List verification codes
  */
 app.get('/api/debug/verification-codes', adaptLambdaHandler(handleListCodes));
+
+/**
+ * User: Profile Picture Upload
+ */
+app.post(
+  '/api/user/profile-picture/upload-link',
+  authMiddleware,
+  adaptLambdaHandler(handleGetUploadLink)
+);
+app.post(
+  '/api/user/profile-picture',
+  authMiddleware,
+  adaptLambdaHandler(handleSaveProfilePicture)
+);
+app.delete(
+  '/api/user/profile-picture',
+  authMiddleware,
+  adaptLambdaHandler(handleDeleteProfilePicture)
+);
 
 /**
  * 404 Not Found handler
@@ -584,6 +663,13 @@ export async function startServer() {
       port,
       environment: EnvConfig.get('ENVIRONMENT'),
     });
+
+    // Initialize chat titles in background (non-blocking)
+    setTimeout(() => {
+      initializeChatTitles().catch((err) => {
+        LoggerUtil.error('Failed to initialize chat titles', err);
+      });
+    }, 2000); // Wait 2 seconds after server starts
   });
 }
 

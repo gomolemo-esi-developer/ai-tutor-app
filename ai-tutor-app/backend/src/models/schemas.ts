@@ -38,6 +38,18 @@ export const updateProfileSchema = z.object({
   profilePicture: z.string().optional(),
 });
 
+export const uploadProfilePictureSchema = z.object({
+  fileName: z.string().min(1, 'File name required'),
+  fileSize: z.number().min(1).max(5 * 1024 * 1024), // 5MB max for images
+  mimeType: z.string().regex(/^image\/(jpeg|png|webp|gif)$/, 'Only PNG, JPEG, WebP, and GIF images are supported'),
+});
+
+export const saveProfilePictureSchema = z.object({
+  fileId: z.string().min(1, 'File ID required'),
+  fileName: z.string().min(1, 'File name required'),
+  s3Key: z.string().min(1, 'S3 key required'),
+});
+
 export const changePasswordSchema = z.object({
   currentPassword: z.string().min(1, 'Current password required'),
   newPassword: z
@@ -227,6 +239,8 @@ export type LoginInput = z.infer<typeof loginSchema>;
 export type RefreshTokenInput = z.infer<typeof refreshTokenSchema>;
 export type UpdateProfileInput = z.infer<typeof updateProfileSchema>;
 export type ChangePasswordInput = z.infer<typeof changePasswordSchema>;
+export type UploadProfilePictureInput = z.infer<typeof uploadProfilePictureSchema>;
+export type SaveProfilePictureInput = z.infer<typeof saveProfilePictureSchema>;
 export type CreateLecturerInput = z.infer<typeof createLecturerSchema>;
 export type UpdateLecturerInput = z.infer<typeof updateLecturerSchema>;
 export type CreateStudentInput = z.infer<typeof createStudentSchema>;

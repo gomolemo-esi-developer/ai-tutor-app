@@ -1,6 +1,6 @@
 /**
  * AI Lambda Handler - Exports all AI endpoints
- * Handles: quiz generation, summarization, chat
+ * Handles: quiz generation, summarization, chat, title generation
  */
 
 export {
@@ -18,4 +18,10 @@ export {
   handleListSessions as listSessionsHandler,
   handleGetMessages as getMessagesHandler,
   handleDeleteSession as deleteSessionHandler,
+  handleGetFileMetadata as getFileMetadataHandler,
 } from './chat';
+
+export {
+  handleGenerateTitleForChat as generateTitleHandler,
+  handleBatchGenerateTitles as batchGenerateTitlesHandler,
+} from './title-generator';

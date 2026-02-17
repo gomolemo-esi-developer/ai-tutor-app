@@ -49,13 +49,15 @@ import {
     SheetTitle,
     SheetTrigger,
 } from "@/components/ui/sheet";
+import { ChatSidebarEnhanced } from "@/components/chat/ChatSidebarEnhanced";
+import { EmptyStateOnboarding } from "@/components/chat/EmptyStateOnboarding";
 
 interface ChatSession {
     id?: string;
     chatId?: string;
-    sessionId?: string;  // Backend returns sessionId
+    sessionId?: string;
     title?: string;
-    topic?: string;  // Backend might use topic instead of title
+    topic?: string;
     lastMessage?: string;
     timestamp?: string;
     createdAt?: number;
@@ -87,9 +89,8 @@ const Chat: React.FC = () => {
     const urlContentIds = searchParams.get("contentIds");
     const urlChatId = searchParams.get("chatId");
 
-    const { selectedContent, setSelectedContent } = useContentSelection();
+    const { selectedContent, setSelectedContent, clearSelection } = useContentSelection();
 
-    // API integration
     const {
         get: getChats,
         post: postChat,
@@ -101,11 +102,11 @@ const Chat: React.FC = () => {
     const [chatSessions, setChatSessions] = useState<ChatSession[]>([]);
     const [currentChatId, setCurrentChatId] = useState<string | null>(urlChatId);
     const [currentMessages, setCurrentMessages] = useState<ChatMessage[]>([]);
+    const [isDataReady, setIsDataReady] = useState(false);
 
     const [message, setMessage] = useState("");
-    const [selectedModule, setSelectedModule] = useState<string>(
-        urlModuleCode || ""
-    );
+    const [selectedModule, setSelectedModule] = useState<string>(urlModuleCode || "");
+    const [selectedModuleId, setSelectedModuleId] = useState<string>("");
     const [modules, setModules] = useState<any[]>([]);
     const [isLoading, setIsLoading] = useState(false);
     const [isAITyping, setIsAITyping] = useState(false);
@@ -113,8 +114,9 @@ const Chat: React.FC = () => {
     const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
     const [chatToDelete, setChatToDelete] = useState<string | null>(null);
     const [isMobileSidebarOpen, setIsMobileSidebarOpen] = useState(false);
+    const [lastMessageTime, setLastMessageTime] = useState<number>(0);
+    const MIN_MESSAGE_INTERVAL = 1000;
 
-    // Load chats and modules on mount
     useEffect(() => {
         loadChats();
         loadModules();
@@ -125,7 +127,6 @@ const Chat: React.FC = () => {
             const data = await getChats("/api/student/modules");
             setModules(data || []);
 
-            // Auto-select module if coming from ModuleContent page
             if (urlModuleCode && data && data.length > 0) {
                 const matchedModule = data.find((m: any) =>
                     m.code === urlModuleCode || m.moduleCode === urlModuleCode
@@ -135,45 +136,85 @@ const Chat: React.FC = () => {
                 }
             }
         } catch (err) {
-            // Modules are optional, so don't show error
             setModules([]);
         }
     };
 
-    // Load specific chat if provided
     useEffect(() => {
-        setIsLoading(true);
-        if (urlChatId) {
-            // Load the chat and restore its context from chatSessions
-            // loadChat handles both module and content restoration with proper metadata
-            loadChat(urlChatId);
-        } else if (urlContentIds || urlModuleCode) {
-            // When creating new chat from URL params, use selected content from context
-            // The selectedContent should already have file names from ModuleContent page
-            // Only set module if we have a module code
-            if (urlModuleCode && !selectedModule) {
-                setSelectedModule(urlModuleCode);
-            }
+        const initializeChat = async () => {
+            if (urlChatId) {
+                // Loading is handled by loadChat itself
+                await loadChat(urlChatId);
+            } else if (urlContentIds || urlModuleCode) {
+                setIsLoading(true);
+                try {
+                    if (urlModuleCode && !selectedModule) {
+                        setSelectedModule(urlModuleCode);
+                    }
 
-            // If we don't have selectedContent but have URL contentIds, create placeholder items
-            // These will have IDs only, but file names will be available if coming from ModuleContent
-            if (urlContentIds && selectedContent.length === 0) {
-                const contentIdArray = urlContentIds.split(',').map(id => id.trim());
-                const contentItems = contentIdArray.map(id => ({
-                    id,
-                    name: id,        // Will be ID if not already loaded with names
-                    title: id,
-                    type: 'file',
-                }));
-                setSelectedContent(contentItems);
+                    if (urlContentIds && urlModuleCode) {
+                        try {
+                            // Fetch content details from the module
+                            const moduleData = await getChats(`/api/student/modules/${urlModuleCode}/content`);
+                            const files = moduleData?.files || [];
+                            const contentIdArray = urlContentIds.split(',').map(id => id.trim());
+                            
+                            // Map IDs to actual content items with proper names
+                             const contentItems = contentIdArray.map(id => {
+                                 const contentItem = files.find((item: any) => item.fileId === id || item.id === id);
+                                 return {
+                                     id,
+                                     name: contentItem?.title || contentItem?.fileName || id,
+                                     title: contentItem?.title || contentItem?.fileName || id,
+                                     type: contentItem?.fileType || contentItem?.type || 'file',
+                                 };
+                             });
+                            setSelectedContent(contentItems);
+                        } catch (error) {
+                            console.error('Failed to fetch content details:', error);
+                            // Fallback to using IDs as names
+                            const contentIdArray = urlContentIds.split(',').map(id => id.trim());
+                            const contentItems = contentIdArray.map(id => ({
+                                id,
+                                name: id,
+                                title: id,
+                                type: 'file',
+                            }));
+                            setSelectedContent(contentItems);
+                        }
+                    } else if (urlContentIds) {
+                        // No module code, fallback to using IDs
+                        const contentIdArray = urlContentIds.split(',').map(id => id.trim());
+                        const contentItems = contentIdArray.map(id => ({
+                            id,
+                            name: id,
+                            title: id,
+                            type: 'file',
+                        }));
+                        setSelectedContent(contentItems);
+                    }
+                    setIsDataReady(true);
+                    setIsLoading(false);
+                } catch (error) {
+                    console.error('Failed to initialize chat:', error);
+                    setIsLoading(false);
+                }
             }
+        };
+        
+        initializeChat();
+    }, [urlChatId, urlContentIds, urlModuleCode, setSelectedContent, getChats]);
 
-            // Do NOT automatically create a chat here
-            // Wait until user sends their first message to create the chat
-            // This prevents empty chats from being created
+    // Clear selectedContent when navigating to /chat without any URL parameters
+    useEffect(() => {
+        if (!urlChatId && !urlContentIds && !urlModuleCode) {
+            // No URL parameters - clear the selected content
+            setSelectedContent([]);
         }
-        setTimeout(() => setIsLoading(false), 300);
-    }, [urlChatId, urlContentIds, urlModuleCode]);
+    }, [urlChatId, urlContentIds, urlModuleCode, setSelectedContent]);
+
+    // Removed URL update useEffect - the URL is now ONLY updated by handleSelectChat
+    // and handleNewChat. This prevents circular dependency loops that cause auto-revert.
 
     const loadChats = async () => {
         try {
@@ -184,130 +225,165 @@ const Chat: React.FC = () => {
         }
     };
 
-    const createNewChat = async (moduleCode?: string, contentIds?: string) => {
-         try {
-             console.log('createNewChat called with:', { moduleCode, contentIds });
-             const payload: any = {
-                 title: "New Chat",
-             };
+    const createNewChat = async (moduleId?: string, contentIds?: string) => {
+        try {
+            const payload: any = { title: "New Chat" };
+            if (moduleId) payload.moduleId = moduleId;
+            if (contentIds) payload.contentIds = contentIds.split(",");
 
-             if (moduleCode) {
-                 payload.moduleCode = moduleCode;
-             }
-             if (contentIds) {
-                 payload.contentIds = contentIds.split(",");
-             }
-
-             console.log('Chat payload:', payload);
-             const newChat = await postChat("/api/chat", payload);
-             console.log('Chat created:', newChat);
-             await loadChats();
-             // Backend returns sessionId as the primary key
-             return (newChat as any)?.sessionId || (newChat as any)?.chatId || (newChat as any)?.id;
-         } catch (err) {
-             console.error('createNewChat error:', err);
-             toast.error("Failed to create chat");
-             return null;
-         }
-     };
-
-
+            const newChat = await postChat("/api/chat", payload);
+            await loadChats();
+            const sessionId = (newChat as any)?.sessionId;
+            if (!sessionId) throw new Error('Chat creation failed');
+            return sessionId;
+        } catch (err) {
+            console.error('createNewChat error:', err);
+            toast.error("Failed to create chat");
+            return null;
+        }
+    };
 
     const loadChat = async (chatId: string) => {
         try {
+            console.log('loadChat called:', { chatId, currentChatId, isDataReady, messageCount: currentMessages.length });
+            
+            // Check if this is a different chat being loaded
+            const isDifferentChat = currentChatId !== chatId;
+            
+            // Skip only if loading the exact same chat that's already fully loaded
+            if (!isDifferentChat && isDataReady && currentMessages.length > 0) {
+                console.log('Chat already loaded, skipping');
+                return;
+            }
+            
+            // Always clear messages when loading (whether same or different chat)
             setIsLoading(true);
-            console.log('Loading chat:', chatId);
+            setIsDataReady(false);
+            setCurrentMessages([]);
 
-            // Set the current chat ID
-            setCurrentChatId(chatId);
-
-            // Fetch the specific chat session to get its metadata
-            // This is more reliable than searching chatSessions which might not be loaded yet
             let session: any = null;
             try {
                 const chatData = await getChats(`/api/chat/${chatId}`);
                 session = chatData;
             } catch (err) {
                 console.warn('Failed to fetch chat metadata, trying cached sessions:', err);
-                // Fallback to searching in chatSessions if API call fails
-                session = chatSessions.find(s => (s.id || s.chatId || s.sessionId) === chatId);
+                session = chatSessions.find(s => s.sessionId === chatId);
             }
 
-            // Restore module context from session
             if (session?.moduleCode) {
                 setSelectedModule(session.moduleCode);
             } else if (session?.moduleId) {
-                setSelectedModule(session.moduleId);
+                // Look up module code from modules list by moduleId
+                const moduleForSession = modules.find(m => 
+                    m.id === session.moduleId || m.moduleId === session.moduleId
+                );
+                setSelectedModule(moduleForSession?.code || moduleForSession?.moduleCode || session.moduleId);
             } else {
                 setSelectedModule("");
             }
 
-            // Restore content context from session
             if (session?.contentIds) {
                 const contentIdArray = Array.isArray(session.contentIds)
                     ? session.contentIds
                     : typeof session.contentIds === 'string'
                         ? session.contentIds.split(',')
                         : [];
-                
-                // Fetch file metadata for each content ID
-                // We'll try to get all module content and match by fileId
-                let contentItems: any[] = [];
-                
+
                 if (contentIdArray.length > 0) {
                     try {
-                        // Fetch all student modules
-                        const allModules = await getChats('/api/student/modules');
-                        
-                        // Build a map of fileId -> fileName by fetching content from all modules
-                        const fileIdToNameMap: { [key: string]: string } = {};
-                        
-                        for (const module of allModules || []) {
+                        const fileMap: { [key: string]: { name: string; isOrphaned: boolean } } = {};
+
+                        if (modules.length > 0) {
                             try {
-                                const moduleCode = module.code || module.moduleCode;
-                                const moduleContent = await getChats(`/api/student/modules/${moduleCode}/content`);
-                                
-                                if (moduleContent?.files && Array.isArray(moduleContent.files)) {
-                                    moduleContent.files.forEach((file: any) => {
-                                        fileIdToNameMap[file.fileId] = file.fileName || file.fileId;
-                                    });
-                                }
-                            } catch (err) {
-                                console.warn(`Failed to fetch content for module ${module.code}:`, err);
+                                const contentPromises = modules.map(m =>
+                                    getChats(`/api/student/modules/${m.code || m.moduleCode}/content`).catch(() => null)
+                                );
+                                const allModuleContents = await Promise.all(contentPromises);
+
+                                allModuleContents.forEach((moduleContent: any) => {
+                                    if (moduleContent?.files && Array.isArray(moduleContent.files)) {
+                                        moduleContent.files.forEach((file: any) => {
+                                            fileMap[file.fileId] = {
+                                                name: file.fileName || file.fileId,
+                                                isOrphaned: false,
+                                            };
+                                        });
+                                    }
+                                });
+                            } catch (moduleErr) {
+                                console.warn('Failed to fetch module contents:', moduleErr);
                             }
                         }
-                        
-                        // Map contentIds to their names
-                        contentItems = contentIdArray.map((id: string) => {
-                            const fileName = fileIdToNameMap[id.trim()];
+
+                        console.log('🗺️ Master file map from modules:', fileMap);
+                        console.log('📌 Looking up fileIds:', contentIdArray);
+
+                        const missingIds = contentIdArray.filter(id => !fileMap[id.trim()]);
+                        if (missingIds.length > 0) {
+                            console.warn(`⚠️ ${missingIds.length} file(s) not found in modules, trying fallback API...`);
+
+                            const fallbackPromises = missingIds.map((id: string) =>
+                                getChats(`/api/file/${id.trim()}`).catch(() => null)
+                            );
+                            const fallbackResults = await Promise.all(fallbackPromises);
+
+                            fallbackResults.forEach((file: any, idx) => {
+                                const fileId = missingIds[idx].trim();
+                                if (file) {
+                                    fileMap[fileId] = {
+                                        name: file.fileName || fileId,
+                                        isOrphaned: true,
+                                    };
+                                    console.log(`✅ Fallback found: ${fileId} → ${file.fileName}`);
+                                } else {
+                                    console.warn(`❌ Fallback failed for: ${fileId}`);
+                                    fileMap[fileId] = {
+                                        name: 'File unavailable',
+                                        isOrphaned: true,
+                                    };
+                                }
+                            });
+                        }
+
+                        const enrichedItems = contentIdArray.map((id: string) => {
+                            const trimmedId = id.trim();
+                            const fileInfo = fileMap[trimmedId];
+                            const found = fileInfo ? '✅' : '❌';
+                            const displayName = fileInfo?.name || 'File unavailable';
+                            console.log(`${found} ID "${trimmedId}" → "${displayName}" (orphaned: ${fileInfo?.isOrphaned})`);
+
                             return {
-                                id: id.trim(),
-                                title: fileName || id.trim(),
-                                name: fileName || id.trim(),
+                                id: trimmedId,
+                                title: displayName,
+                                name: displayName,
                                 type: 'file',
+                                isOrphaned: fileInfo?.isOrphaned || false,
                             };
                         });
+
+                        console.log('✅ Enriched items:', enrichedItems);
+                        setSelectedContent(enrichedItems);
                     } catch (err) {
-                        console.warn('Failed to fetch content metadata:', err);
-                        // Fallback to using IDs as titles
-                        contentItems = contentIdArray.map((id: string) => ({
+                        console.warn('Failed to resolve file names:', err);
+                        setSelectedContent(contentIdArray.map((id: string) => ({
                             id: id.trim(),
-                            title: id.trim(),
-                            name: id.trim(),
+                            title: 'File unavailable',
+                            name: 'File unavailable',
                             type: 'file',
-                        }));
+                            isOrphaned: true,
+                        })));
                     }
+                } else {
+                    console.log('ℹ️ Session has no contentIds - clearing selection');
                 }
-                setSelectedContent(contentItems);
             } else {
+                // Chat has no contentIds - clear selected content to avoid showing previous chat's content
                 setSelectedContent([]);
             }
 
-            // Load messages from backend
             const messages = await getMessages(`/api/chat/${chatId}/messages?limit=100&page=1`);
             console.log('Messages loaded:', messages);
 
-            // Convert API response to display format
             const displayMessages: ChatMessage[] = (messages || []).map((msg: any) => ({
                 id: msg.messageId,
                 messageId: msg.messageId,
@@ -317,32 +393,36 @@ const Chat: React.FC = () => {
             }));
 
             console.log('Display messages:', displayMessages);
+            setCurrentChatId(chatId);
             setCurrentMessages(displayMessages);
+            console.log('🔧 Setting isDataReady=true, isLoading=false');
+            setIsDataReady(true);
             setIsLoading(false);
+            console.log('✅ Data ready - content and messages loaded');
         } catch (err) {
-            console.error('Error loading chat:', err);
+            console.error('❌ Error loading chat:', err);
             toast.error("Failed to load messages");
             setIsLoading(false);
+            setIsDataReady(false);
         }
     };
 
     const addMessage = async (messageContent: string) => {
         try {
-            // If no chat exists, create one first
             let chatId = currentChatId;
+            
+            // If no chat exists yet, create one on first message
             if (!chatId) {
-                chatId = await createNewChat(selectedModule || undefined, selectedContent.map(c => c.id).join(',') || undefined);
+                const moduleIdForChat = selectedModuleId || undefined;
+                const contentIdsForChat = selectedContent.map(c => c.id).join(',') || undefined;
+                chatId = await createNewChat(moduleIdForChat, contentIdsForChat);
                 if (!chatId) {
                     toast.error("Failed to create chat session");
                     return;
                 }
                 setCurrentChatId(chatId);
-
-                // Don't clear selected content - keep it displayed throughout the conversation
-                // Users need to see what context their questions are based on
             }
 
-            // Display user message immediately
             const userMsg: ChatMessage = {
                 id: `msg-${Date.now()}`,
                 messageId: `msg-${Date.now()}`,
@@ -354,19 +434,15 @@ const Chat: React.FC = () => {
             setCurrentMessages((prev) => [...prev, userMsg]);
             setIsAITyping(true);
 
-            // Send message to backend
             const response = await postMessage(`/api/chat/${chatId}/messages`, {
                 message: messageContent,
             });
 
-            // Backend returns both user and AI messages
             console.log('Response from backend:', response);
             if (response && response.userMessage && response.assistantMessage) {
-                console.log('Adding both messages to chat:', response.userMessage, response.assistantMessage);
-                // Replace the temp user message with the real one from backend
                 setCurrentMessages((prev) => {
                     const withoutTemp = prev.filter((msg) => msg.content !== messageContent || msg.sender !== 'user');
-                    const newMessages = [
+                    return [
                         ...withoutTemp,
                         {
                             id: response.userMessage.messageId,
@@ -383,15 +459,12 @@ const Chat: React.FC = () => {
                             timestamp: response.assistantMessage.createdAt,
                         },
                     ];
-                    console.log('Updated messages:', newMessages);
-                    return newMessages;
                 });
 
-                // Update chat list to show latest message
-                setChatSessions((prev) =>
-                    prev.map((chat) => {
-                        const chatId = chat.id || chat.chatId || chat.sessionId;
-                        if (chatId === currentChatId) {
+                setChatSessions((prev) => {
+                    const chatExists = prev.some(chat => chat.sessionId === chatId);
+                    const updated = prev.map((chat) => {
+                        if (chat.sessionId === chatId) {
                             return {
                                 ...chat,
                                 lastMessage: response.assistantMessage.content,
@@ -399,10 +472,28 @@ const Chat: React.FC = () => {
                             };
                         }
                         return chat;
-                    })
-                );
-            } else {
-                console.log('Response missing required fields:', { hasUserMessage: !!response?.userMessage, hasAssistantMessage: !!response?.assistantMessage });
+                    });
+                    
+                    // If chat doesn't exist yet (new chat), reload the list
+                    if (!chatExists) {
+                        loadChats();
+                    }
+                    
+                    return updated;
+                });
+            }
+
+            // Generate title for the chat if it doesn't have one yet
+            if (chatId && (!currentMessages[0] || currentMessages[0]?.sender === 'ai')) {
+                // After first exchange, generate a descriptive title
+                try {
+                    await postMessage(`/api/chat/${chatId}/generate-title`, {});
+                    // Reload chats to show the updated title
+                    await loadChats();
+                } catch (err) {
+                    console.warn('Failed to generate chat title:', err);
+                    // Not critical, continue without error
+                }
             }
 
             setIsAITyping(false);
@@ -416,20 +507,46 @@ const Chat: React.FC = () => {
         if (isAITyping) {
             const interval = setInterval(() => {
                 setLoadingMessage(
-                    funLoadingMessages[
-                    Math.floor(Math.random() * funLoadingMessages.length)
-                    ]
+                    funLoadingMessages[Math.floor(Math.random() * funLoadingMessages.length)]
                 );
             }, 2000);
             return () => clearInterval(interval);
         }
     }, [isAITyping]);
 
-    const hasContext =
-        selectedModule || selectedContent.length > 0 || currentChatId;
+    const hasContext = selectedModule || selectedContent.length > 0 || currentChatId;
+
+    const validateMessage = (content: string): { valid: boolean; error?: string } => {
+        if (!content || !content.trim()) {
+            return { valid: false, error: 'Message cannot be empty' };
+        }
+        if (content.length > 5000) {
+            return { valid: false, error: 'Message too long (max 5000 chars)' };
+        }
+        const xssPatterns = [/<script/i, /javascript:/i, /onerror=/i, /onload=/i, /onclick=/i];
+        for (const pattern of xssPatterns) {
+            if (pattern.test(content)) {
+                return { valid: false, error: 'Message contains invalid content' };
+            }
+        }
+        return { valid: true };
+    };
 
     const handleSendMessage = async () => {
         if (!message.trim() || !hasContext) return;
+
+        const now = Date.now();
+        if (now - lastMessageTime < MIN_MESSAGE_INTERVAL) {
+            toast.error('Please wait before sending another message');
+            return;
+        }
+        setLastMessageTime(now);
+
+        const validation = validateMessage(message);
+        if (!validation.valid) {
+            toast.error(validation.error);
+            return;
+        }
 
         const userMessage = message;
         setMessage("");
@@ -448,166 +565,90 @@ const Chat: React.FC = () => {
     };
 
     const confirmDeleteChat = async () => {
-        if (chatToDelete && chatToDelete.trim()) {
-            try {
-                console.log('Deleting chat:', chatToDelete);
-                await deleteChat(`/api/chat/${chatToDelete}`);
-                await loadChats();
+        if (!chatToDelete || !chatToDelete.trim()) {
+            toast.error("Invalid chat ID");
+            setDeleteDialogOpen(false);
+            return;
+        }
+
+        try {
+            setDeleteDialogOpen(false);
+            setChatToDelete(null);
+
+            await deleteChat(`/api/chat/${chatToDelete}`);
+
+            setChatSessions(prev =>
+                prev.filter(s => s.sessionId !== chatToDelete)
+            );
+
+            if (currentChatId === chatToDelete) {
                 setCurrentChatId(null);
                 setCurrentMessages([]);
-                toast.success("Chat deleted");
-            } catch (err) {
-                console.error('Delete error:', err);
-                toast.error("Failed to delete chat");
+                setSelectedModule("");
+                setSelectedModuleId("");
+                setSelectedContent([]);
+                navigate('/chat', { replace: true });
             }
-        } else {
-            toast.error("Invalid chat ID");
+
+            await loadChats();
+            toast.success("Chat deleted");
+        } catch (err) {
+            console.error('Delete error:', err);
+            toast.error("Failed to delete chat");
+            await loadChats();
         }
-        setDeleteDialogOpen(false);
-        setChatToDelete(null);
     };
 
-    const handleNewChat = async () => {
-        // Create new chat with current selected content/module if available
-        const moduleCode = selectedModule || undefined;
-        const contentIds = selectedContent.length > 0 
-            ? selectedContent.map(c => c.id).join(',')
-            : undefined;
-
-        const newId = await createNewChat(moduleCode, contentIds);
-        if (newId) {
-            navigate(`/chat?chatId=${newId}`);
-            setIsMobileSidebarOpen(false);
-        }
+    const handleNewChat = () => {
+        // Reset chat state for new conversation
+        // Don't create chat until first message is sent
+        setCurrentChatId(null);
+        setCurrentMessages([]);
+        setMessage("");
+        clearSelection();
+        navigate("/chat");
+        setIsMobileSidebarOpen(false);
     };
 
     const handleSelectChat = async (session: ChatSession) => {
-        // Accept either id, chatId, or sessionId from backend
-        const sessionId = session.id || session.chatId || session.sessionId;
+        const sessionId = session.sessionId;
         if (sessionId) {
-            setCurrentChatId(sessionId);
-            await loadChat(sessionId);
-
-            // Restore this chat's own context (module + content)
-            if (session.moduleId) {
-                setSelectedModule(session.moduleId);
-            } else {
-                setSelectedModule("");
-            }
-
-            if (session.contentIds) {
-                // Reconstruct ContentItem array from contentIds string
-                const contentIdArray = Array.isArray(session.contentIds)
-                    ? session.contentIds
-                    : typeof session.contentIds === 'string'
-                        ? session.contentIds.split(',')
-                        : [];
-
-                const contentItems = contentIdArray.map(id => ({
-                    id: id.trim(),
-                    name: id.trim(),
-                }));
-                setSelectedContent(contentItems);
-            } else {
-                setSelectedContent([]);
-            }
-
+            // Just update the URL - let the initialization useEffect handle loading the chat
+            // This prevents duplicate loadChat calls and race conditions
             navigate(`/chat?chatId=${sessionId}`);
             setIsMobileSidebarOpen(false);
         }
     };
 
     const ChatSidebarContent = () => (
-        <>
-            <div className="p-4">
-                <Button className="w-full" onClick={handleNewChat}>
-                    <Plus className="w-4 h-4 mr-2" />
-                    New Chat
-                </Button>
-            </div>
-            <div className="flex-1 p-4 overflow-auto scrollbar-thin">
-                <h3 className="text-xs font-semibold text-muted-foreground uppercase tracking-wider mb-3">
-                    Recent Chats
-                </h3>
-                <div className="space-y-2">
-                    {chatSessions.map((session) => {
-                        const sessionId = session.id || session.chatId || session.sessionId;
-                        return (
-                            <div
-                                key={sessionId}
-                                onClick={() => handleSelectChat(session)}
-                                className={cn(
-                                    "p-3 rounded-xl cursor-pointer transition-all group card-interactive",
-                                    currentChatId === sessionId &&
-                                    "border-primary bg-primary/5"
-                                )}
-                            >
-                                <div className="flex items-start justify-between mb-1">
-                                    <h4 className="font-medium text-sm text-foreground truncate flex-1">
-                                        {session.title}
-                                    </h4>
-                                    <DropdownMenu>
-                                        <DropdownMenuTrigger
-                                            asChild
-                                            onClick={(e) => e.stopPropagation()}
-                                        >
-                                            <button className="opacity-0 group-hover:opacity-100 transition-opacity p-1 hover:bg-secondary rounded">
-                                                <MoreVertical className="w-4 h-4 text-muted-foreground" />
-                                            </button>
-                                        </DropdownMenuTrigger>
-                                        <DropdownMenuContent
-                                            align="end"
-                                            className="bg-popover border-border"
-                                        >
-                                            <DropdownMenuItem
-                                                 className="text-destructive"
-                                                 disabled={!sessionId}
-                                                 onClick={(e) => {
-                                                     e.stopPropagation();
-                                                     if (sessionId) {
-                                                         handleDeleteChat(sessionId);
-                                                     }
-                                                 }}
-                                             >
-                                                 <Trash2 className="w-4 h-4 mr-2" />
-                                                 Delete
-                                             </DropdownMenuItem>
-                                        </DropdownMenuContent>
-                                    </DropdownMenu>
-                                </div>
-                                <p className="text-xs text-muted-foreground truncate mb-1">
-                                    {session.lastMessage || `${session.messageCount || 0} messages`}
-                                </p>
-                                <div className="flex items-center justify-between">
-                                    <span className="text-xs text-primary">
-                                        {session.moduleCode}
-                                    </span>
-                                    <span className="text-xs text-muted-foreground">
-                                        {session.timestamp ||
-                                            (session.createdAt
-                                                ? typeof session.createdAt === 'string'
-                                                    ? new Date(session.createdAt).toLocaleDateString()
-                                                    : new Date(session.createdAt).toLocaleDateString()
-                                                : 'N/A')}
-                                    </span>
-                                </div>
-                            </div>
-                        );
-                    })}
-                </div>
-            </div>
-        </>
+        <ChatSidebarEnhanced
+            chatSessions={chatSessions}
+            currentChatId={urlChatId}
+            onSelectChat={(chatId) => {
+                const session = chatSessions.find((s) => (s.sessionId || s.chatId || s.id) === chatId);
+                if (session) {
+                    handleSelectChat(session);
+                    setIsMobileSidebarOpen(false);
+                }
+            }}
+            onDeleteChat={(chatId) => {
+                setChatToDelete(chatId);
+                setDeleteDialogOpen(true);
+            }}
+            onCreateNewChat={handleNewChat}
+        />
     );
 
-    if (isLoading) {
-        return (
-            <MainLayout>
-                <div className="flex-1 flex items-center justify-center">
-                    <LoadingSpinner message="Loading chat..." />
-                </div>
-            </MainLayout>
-        );
-    }
+    // Don't show loading overlay - let it show content beneath while loading
+    // if (isLoading) {
+    //     return (
+    //         <MainLayout>
+    //             <div className="flex-1 flex items-center justify-center">
+    //                 <LoadingSpinner message="Loading chat..." />
+    //             </div>
+    //         </MainLayout>
+    //     );
+    // }
 
     return (
         <MainLayout
@@ -628,10 +669,7 @@ const Chat: React.FC = () => {
                                 Ask questions and enhance your learning
                             </p>
                         </div>
-                        <Sheet
-                            open={isMobileSidebarOpen}
-                            onOpenChange={setIsMobileSidebarOpen}
-                        >
+                        <Sheet open={isMobileSidebarOpen} onOpenChange={setIsMobileSidebarOpen}>
                             <SheetTrigger asChild>
                                 <Button variant="outline" size="icon" className="lg:hidden">
                                     <MessageSquare className="w-5 h-5" />
@@ -649,65 +687,104 @@ const Chat: React.FC = () => {
                     </div>
                 </header>
 
-                <div className="px-4 md:px-6 pt-4">
-                    <SelectedContentBar />
-                </div>
-
-                <div className="flex-1 overflow-y-auto p-4 md:p-6 scrollbar-thin">
-                    <div className="max-w-3xl mx-auto space-y-4">
-                        {currentMessages.map((msg) => (
-                            <div
-                                key={msg.id}
-                                className={cn(
-                                    "flex gap-2 md:gap-3 animate-slide-up",
-                                    msg.sender === "user" ? "flex-row-reverse" : ""
-                                )}
-                            >
-                                <div
-                                    className={cn(
-                                        "w-8 h-8 md:w-9 md:h-9 rounded-full flex items-center justify-center flex-shrink-0",
-                                        msg.sender === "ai"
-                                            ? "bg-primary/20 text-primary"
-                                            : "bg-secondary text-muted-foreground"
-                                    )}
-                                >
-                                    {msg.sender === "ai" ? (
-                                        <Sparkles className="w-4 h-4 md:w-5 md:h-5" />
-                                    ) : (
-                                        <span className="text-xs md:text-sm font-medium">U</span>
-                                    )}
-                                </div>
-                                <div
-                                    className={cn(
-                                        "max-w-[85%] md:max-w-[80%] p-3 md:p-4 rounded-2xl",
-                                        msg.sender === "ai"
-                                            ? "bg-card border border-border rounded-tl-sm"
-                                            : "bg-primary text-primary-foreground rounded-tr-sm"
-                                    )}
-                                >
-                                    {msg.sender === "ai" ? (
-                                        <AIMessageRenderer content={msg.content} />
-                                    ) : (
-                                        <p className="text-xs md:text-sm leading-relaxed">
-                                            {msg.content}
-                                        </p>
-                                    )}
-                                </div>
-                            </div>
-                        ))}
-                        {isAITyping && (
-                            <div className="flex gap-2 md:gap-3">
-                                <div className="w-8 h-8 md:w-9 md:h-9 rounded-full flex items-center justify-center flex-shrink-0 bg-primary/20 text-primary">
-                                    <Sparkles className="w-4 h-4 md:w-5 md:h-5" />
-                                </div>
-                                <div className="max-w-[85%] md:max-w-[80%] p-3 md:p-4 rounded-2xl bg-card border border-border rounded-tl-sm">
-                                    <p className="text-xs md:text-sm leading-relaxed text-muted-foreground animate-pulse">
-                                        {loadingMessage}
-                                    </p>
+                {(selectedContent.length > 0 || isDataReady || selectedModule) && !isLoading && (
+                    <div className="px-4 md:px-6 pt-4 space-y-3">
+                        {selectedContent.length > 0 && <SelectedContentBar />}
+                        {selectedModule && selectedContent.length === 0 && (
+                            <div className="bg-blue-50 dark:bg-blue-950 border border-blue-200 dark:border-blue-800 rounded-lg p-3">
+                                <div className="flex items-center gap-2">
+                                    <Sparkles className="w-4 h-4 text-blue-600 dark:text-blue-400" />
+                                    <span className="text-sm font-medium text-blue-900 dark:text-blue-200">
+                                        Using all content from {selectedModule}
+                                    </span>
                                 </div>
                             </div>
                         )}
                     </div>
+                )}
+
+                <div className="flex-1 overflow-y-auto p-4 md:p-6 scrollbar-thin">
+                    {console.log('🔍 Render state:', { isDataReady, isLoading, messagesCount: currentMessages.length, isAITyping, currentChatId })}
+                    {isLoading ? (
+                        <div className="flex items-center justify-center h-full">
+                            <LoadingSpinner message="Loading messages..." />
+                        </div>
+                    ) : currentMessages.length === 0 && !isAITyping ? (
+                        <EmptyStateOnboarding
+                            hasContext={hasContext}
+                            onBrowseContent={() => navigate('/modules')}
+                            onSuggestedPrompt={(prompt) => {
+                                setMessage(prompt);
+                                setTimeout(() => {
+                                    const inputElement = document.querySelector(
+                                        'input[placeholder*="question"]'
+                                    ) as HTMLInputElement;
+                                    inputElement?.focus();
+                                }, 100);
+                            }}
+                        />
+                    ) : (
+                        <div className="max-w-3xl mx-auto space-y-4">
+                            {console.log('📝 Rendering messages container with', currentMessages.length, 'messages')}
+                            {currentMessages.map((msg) => (
+                                <div
+                                    key={msg.id}
+                                    className={cn(
+                                        "flex gap-2 md:gap-3 animate-slide-up",
+                                        msg.sender === "user" ? "flex-row-reverse" : ""
+                                    )}
+                                >
+                                    <div
+                                        className={cn(
+                                            "w-8 h-8 md:w-9 md:h-9 rounded-full flex items-center justify-center flex-shrink-0",
+                                            msg.sender === "ai"
+                                                ? "bg-primary/20 text-primary"
+                                                : "bg-secondary text-muted-foreground"
+                                        )}
+                                    >
+                                        {msg.sender === "ai" ? (
+                                            <Sparkles className="w-4 h-4 md:w-5 md:h-5" />
+                                        ) : (
+                                            <span className="text-xs md:text-sm font-medium">U</span>
+                                        )}
+                                    </div>
+                                    <div
+                                        className={cn(
+                                            "max-w-[85%] md:max-w-[80%] p-3 md:p-4 rounded-2xl",
+                                            msg.sender === "ai"
+                                                ? "bg-card border border-border rounded-tl-sm"
+                                                : "bg-primary text-primary-foreground rounded-tr-sm"
+                                        )}
+                                    >
+                                        {msg.sender === "ai" ? (
+                                            <AIMessageRenderer content={msg.content} />
+                                        ) : (
+                                            <p className="text-xs md:text-sm leading-relaxed">
+                                                {msg.content}
+                                            </p>
+                                        )}
+                                        {msg.timestamp && (
+                                            <p className="text-xs opacity-70 mt-2">
+                                                {new Date(msg.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                                            </p>
+                                        )}
+                                    </div>
+                                </div>
+                            ))}
+                            {isAITyping && (
+                                <div className="flex gap-2 md:gap-3">
+                                    <div className="w-8 h-8 md:w-9 md:h-9 rounded-full flex items-center justify-center flex-shrink-0 bg-primary/20 text-primary">
+                                        <Sparkles className="w-4 h-4 md:w-5 md:h-5" />
+                                    </div>
+                                    <div className="max-w-[85%] md:max-w-[80%] p-3 md:p-4 rounded-2xl bg-card border border-border rounded-tl-sm">
+                                        <p className="text-xs md:text-sm leading-relaxed text-muted-foreground animate-pulse">
+                                            {loadingMessage}
+                                        </p>
+                                    </div>
+                                </div>
+                            )}
+                        </div>
+                    )}
                 </div>
 
                 <div className="p-4 md:p-6">
@@ -720,7 +797,14 @@ const Chat: React.FC = () => {
                         </div>
                     )}
                     <div className="max-w-3xl mx-auto flex flex-col sm:flex-row gap-3">
-                        <Select value={selectedModule} onValueChange={setSelectedModule}>
+                        <Select 
+                            value={selectedModule} 
+                            onValueChange={(code) => {
+                                setSelectedModule(code);
+                                const module = modules.find(m => (m.code || m.moduleCode) === code);
+                                setSelectedModuleId(module?.id || module?.moduleId || "");
+                            }}
+                        >
                             <SelectTrigger className="w-full sm:w-56">
                                 <SelectValue placeholder="Select module to provide context" />
                             </SelectTrigger>
@@ -729,7 +813,7 @@ const Chat: React.FC = () => {
                                     modules.map((module) => (
                                         <SelectItem
                                             key={module.id || module.moduleId}
-                                            value={module.id || module.moduleId || ""}
+                                            value={module.code || module.moduleCode || ""}
                                         >
                                             <div className="flex flex-col">
                                                 <span className="font-medium">

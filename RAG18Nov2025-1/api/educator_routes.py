@@ -350,15 +350,44 @@ async def verify_document_vectors(document_id: str):
             "error": str(e)
         }
 
-@router.delete("/documents/{filename}")
-async def delete_document(filename: str):
+@router.delete("/documents/{document_id}")
+async def delete_document(document_id: str):
+    """
+    Delete a document from the RAG system by document_id.
+    Removes all chunks and embeddings from Chroma DB.
+    
+    Args:
+        document_id: The unique document ID to delete
+        
+    Returns:
+        Success message with deletion details
+    """
     try:
-        file_path = DATA_INPUT_DIR / filename
-        if file_path.exists():
-            file_path.unlink()
-            return {"message": f"Deleted {filename}"}
-        else:
-            raise HTTPException(status_code=404, detail="File not found")
+        collection = get_chroma_collection()
+        
+        # Get all chunks for this document to count before deletion
+        results = collection.get(
+            where={"document_id": document_id},
+            include=[]
+        )
+        
+        chunk_count = len(results['ids']) if results['ids'] else 0
+        
+        if chunk_count == 0:
+            raise HTTPException(status_code=404, detail=f"No chunks found for document {document_id}")
+        
+        # Delete all chunks for this document from Chroma DB
+        collection.delete(
+            where={"document_id": document_id}
+        )
+        
+        return {
+            "message": f"Deleted document {document_id}",
+            "document_id": document_id,
+            "chunks_deleted": chunk_count
+        }
+    except HTTPException:
+        raise
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
 

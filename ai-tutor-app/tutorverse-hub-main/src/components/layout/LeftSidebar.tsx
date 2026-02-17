@@ -68,6 +68,13 @@ const LeftSidebar: React.FC = () => {
     setIsMobileMenuOpen(false);
   };
 
+  // Construct full name from firstName and lastName
+  const fullName = user?.firstName && user?.lastName 
+    ? `${user.firstName} ${user.lastName}`
+    : user?.fullName || 'User';
+  
+  const firstLetter = fullName.charAt(0).toUpperCase();
+
   const SidebarContent = () => (
     <>
       {/* Logo Section */}
@@ -105,14 +112,22 @@ const LeftSidebar: React.FC = () => {
       {/* User Section */}
       <div className="p-3 md:p-4">
         <div className="flex items-center gap-3 mb-3">
-          <div className="w-9 h-9 rounded-full bg-primary/20 flex items-center justify-center">
-            <span className="text-sm font-medium text-primary">
-              {user?.fullName?.charAt(0) || 'U'}
-            </span>
+          <div className="w-9 h-9 rounded-full bg-primary/20 flex items-center justify-center overflow-hidden">
+            {user?.profilePictureUrl ? (
+              <img
+                src={user.profilePictureUrl}
+                alt={fullName}
+                className="w-full h-full object-cover"
+              />
+            ) : (
+              <span className="text-sm font-medium text-primary">
+                {firstLetter}
+              </span>
+            )}
           </div>
           <div className="flex-1 min-w-0">
             <p className="text-sm font-medium text-foreground truncate">
-              {user?.fullName || 'User'}
+              {fullName}
             </p>
             <p className="text-xs text-muted-foreground capitalize">
               {user?.role || 'Student'}

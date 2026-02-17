@@ -28,13 +28,14 @@ interface QuickLink {
 
 export class QuickBypassService {
   /**
-   * Generate quick link for existing pre-registered Student/Lecturer
-   * Looks up by studentNumber or staffNumber
-   */
+    * Generate quick link for existing pre-registered Student/Lecturer/Admin
+    * Looks up by studentNumber, staffNumber, or email (for admin)
+    */
   static async generateQuickLinkForExisting(
     studentNumber?: string,
     staffNumber?: string,
-    role?: 'STUDENT' | 'EDUCATOR'
+    role?: 'STUDENT' | 'EDUCATOR' | 'ADMIN',
+    email?: string
   ): Promise<{
     link: string;
     qrCode: string;
@@ -44,12 +45,34 @@ export class QuickBypassService {
     try {
       const tables = DatabaseConfig.getTables();
 
-      // 1. Find Student or Lecturer record
+      // 1. Find Student, Lecturer, or Admin record
       let record: any;
       let recordTableName: string;
       let recordIdField: string;
+      let isDirectUserLookup = false;
 
-      if (role === 'STUDENT' && studentNumber) {
+      if (role === 'ADMIN' && email) {
+        // For admins, lookup directly in USERS table by email
+        const query = await DynamoDBService.query(
+          tables.USERS,
+          'email = :email',
+          { ':email': email },
+          { indexName: 'email-index' }
+        );
+
+        if (!query.items || query.items.length === 0) {
+          throw new NotFoundError(`Admin user not found with email: ${email}`);
+        }
+
+        record = query.items[0];
+        
+        // Verify the user is actually an admin (ADMIN or super_admin)
+        if (!['ADMIN', 'super_admin'].includes(record.role)) {
+          throw new UnauthorizedError(`User with email ${email} is not an admin`);
+        }
+
+        isDirectUserLookup = true;
+      } else if (role === 'STUDENT' && studentNumber) {
         const query = await DynamoDBService.query(
           tables.STUDENTS,
           'studentNumber = :num',
@@ -81,63 +104,19 @@ export class QuickBypassService {
         recordIdField = 'lecturerId';
       } else {
         throw new BadRequestError(
-          'Invalid parameters. Provide studentNumber or staffNumber with matching role.'
+          'Invalid parameters. Provide studentNumber (STUDENT), staffNumber (EDUCATOR), or email (ADMIN) with matching role.'
         );
       }
 
-      const email = record.email;
-
-      // 2. Check if User exists
-      let userQuery = await DynamoDBService.query(
-        tables.USERS,
-        'email = :email',
-        { ':email': email },
-        { indexName: 'email-index' }
-      );
-
+      const adminEmail = record.email;
       let user: Partial<User>;
 
-      if (!userQuery.items || userQuery.items.length === 0) {
-        // Create new User
-        const userId = this.generateUUID();
-        user = {
-          userId,
-          email,
-          firstName: record.firstName,
-          lastName: record.lastName,
-          role: role === 'STUDENT' ? 'STUDENT' : 'EDUCATOR',
-          isActivated: true, // Auto-activate for quick bypass
-          createdAt: Date.now(),
-          updatedAt: Date.now(),
-          createdBy: 'quick-bypass-system',
-        };
+      // 2. Handle user lookup/creation based on role
+      if (isDirectUserLookup) {
+        // For admin, we already have the user record from USERS table
+        user = record;
 
-        await DynamoDBService.put(tables.USERS, user);
-
-        // Link Student/Lecturer to User
-        const updatePayload: any = {
-          userId: user.userId,
-          registrationStatus: 'ACTIVE',
-          updatedAt: Date.now(),
-        };
-
-        await DynamoDBService.update(
-          recordTableName,
-          { [recordIdField]: record[recordIdField] },
-          updatePayload
-        );
-
-        LoggerUtil.info('User created and linked via quick bypass', {
-          userId: user.userId,
-          email,
-          role,
-          [role === 'STUDENT' ? 'studentNumber' : 'staffNumber']:
-            role === 'STUDENT' ? studentNumber : staffNumber,
-        });
-      } else {
-        user = userQuery.items[0];
-
-        // Ensure user is activated
+        // Ensure admin user is activated
         if (!user.isActivated) {
           await DynamoDBService.update(
             tables.USERS,
@@ -145,10 +124,73 @@ export class QuickBypassService {
             { isActivated: true, updatedAt: Date.now() }
           );
 
-          LoggerUtil.info('User activated via quick bypass', {
+          LoggerUtil.info('Admin user activated via quick bypass', {
             userId: user.userId,
-            email,
+            email: user.email,
           });
+        }
+      } else {
+        // For student/educator, check if User exists in USERS table
+        let userQuery = await DynamoDBService.query(
+          tables.USERS,
+          'email = :email',
+          { ':email': adminEmail },
+          { indexName: 'email-index' }
+        );
+
+        if (!userQuery.items || userQuery.items.length === 0) {
+          // Create new User
+          const userId = this.generateUUID();
+          user = {
+            userId,
+            email: adminEmail,
+            firstName: record.firstName,
+            lastName: record.lastName,
+            role: role === 'STUDENT' ? 'STUDENT' : 'EDUCATOR',
+            isActivated: true, // Auto-activate for quick bypass
+            createdAt: Date.now(),
+            updatedAt: Date.now(),
+            createdBy: 'quick-bypass-system',
+          };
+
+          await DynamoDBService.put(tables.USERS, user);
+
+          // Link Student/Lecturer to User
+          const updatePayload: any = {
+            userId: user.userId,
+            registrationStatus: 'ACTIVE',
+            updatedAt: Date.now(),
+          };
+
+          await DynamoDBService.update(
+            recordTableName,
+            { [recordIdField]: record[recordIdField] },
+            updatePayload
+          );
+
+          LoggerUtil.info('User created and linked via quick bypass', {
+            userId: user.userId,
+            email: adminEmail,
+            role,
+            [role === 'STUDENT' ? 'studentNumber' : 'staffNumber']:
+              role === 'STUDENT' ? studentNumber : staffNumber,
+          });
+        } else {
+          user = userQuery.items[0];
+
+          // Ensure user is activated
+          if (!user.isActivated) {
+            await DynamoDBService.update(
+              tables.USERS,
+              { userId: user.userId },
+              { isActivated: true, updatedAt: Date.now() }
+            );
+
+            LoggerUtil.info('User activated via quick bypass', {
+              userId: user.userId,
+              email: adminEmail,
+            });
+          }
         }
       }
 
@@ -173,7 +215,7 @@ export class QuickBypassService {
         userAgent: undefined,
         metadata: {
           type: 'existing-user',
-          registrationNumber: studentNumber || staffNumber,
+          registrationNumber: role === 'ADMIN' ? undefined : (studentNumber || staffNumber),
         },
       };
 
@@ -193,7 +235,8 @@ export class QuickBypassService {
         },
       });
 
-      LoggerUtil.info('Quick link generated for existing user', {
+      const logMessage = role === 'ADMIN' ? 'Quick link generated for admin user' : 'Quick link generated for existing user';
+      LoggerUtil.info(logMessage, {
         userId: user.userId,
         email: user.email,
         role,
@@ -327,16 +370,17 @@ export class QuickBypassService {
       });
 
       return {
-        accessToken: tokens.accessToken,
-        refreshToken: tokens.refreshToken,
-        user: {
-          userId: user.userId,
-          email: user.email,
-          firstName: user.firstName,
-          lastName: user.lastName,
-          role: user.role,
-        },
-      };
+         accessToken: tokens.accessToken,
+         refreshToken: tokens.refreshToken,
+         user: {
+           userId: user.userId,
+           email: user.email,
+           firstName: user.firstName,
+           lastName: user.lastName,
+           role: user.role,
+           profilePictureUrl: user.profilePictureUrl,
+         },
+       };
     } catch (error) {
       if (error instanceof UnauthorizedError || error instanceof NotFoundError) {
         throw error;

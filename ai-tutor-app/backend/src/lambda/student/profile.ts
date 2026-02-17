@@ -1,9 +1,9 @@
 /**
  * Student Profile Handler
- * GET /api/student/profile - Get student profile (name, number, campus, department, enrollment year)
+ * GET /api/student/profile - Get student profile (name, number, campus, department, enrollment year, profile picture)
  *
  * Frontend: /profile route (Personal Information Card + Academic Information Card)
- * Response Format: firstName, lastName, studentNumber, email, campusName, departmentName, enrollmentYear, enrolledModulesCount
+ * Response Format: firstName, lastName, studentNumber, email, campusName, departmentName, enrollmentYear, enrolledModulesCount, profilePictureUrl
  */
 
 import { APIGatewayProxyEvent, APIGatewayProxyResult } from 'aws-lambda';
@@ -69,19 +69,31 @@ export async function handleGetStudentProfile(
 
     const student = items[0];
 
-    // Get campus name
-    const campus = await DynamoDBService.get(
-      tables.CAMPUSES,
-      { campusId: student.campusId }
-    );
-    const campusName = campus?.campusName || 'Unknown';
+     // Get user profile picture URL if available
+     let profilePictureUrl = undefined;
+     try {
+       const user = await DynamoDBService.get(
+         tables.USERS,
+         { userId }
+       );
+       profilePictureUrl = user?.profilePictureUrl;
+     } catch (err) {
+       LoggerUtil.warn('Failed to fetch user profile picture', { userId });
+     }
 
-    // Get department name
-    const department = await DynamoDBService.get(
-      tables.DEPARTMENTS,
-      { departmentId: student.departmentId }
-    );
-    const departmentName = department?.departmentName || 'Unknown';
+     // Get campus name
+     const campus = await DynamoDBService.get(
+       tables.CAMPUSES,
+       { campusId: student.campusId }
+     );
+     const campusName = campus?.campusName || 'Unknown';
+
+     // Get department name
+     const department = await DynamoDBService.get(
+       tables.DEPARTMENTS,
+       { departmentId: student.departmentId }
+     );
+     const departmentName = department?.departmentName || 'Unknown';
 
     // Get course name if courseId exists
     let courseName = undefined;
@@ -112,6 +124,7 @@ export async function handleGetStudentProfile(
       courseCode: courseCode,
       enrollmentYear: student.enrollmentYear,
       enrolledModulesCount: student.moduleIds?.length || 0,
+      profilePictureUrl: profilePictureUrl,
     };
 
     LoggerUtil.info('Student profile retrieved', {

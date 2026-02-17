@@ -34,7 +34,7 @@ const Modules: React.FC = () => {
 
   useEffect(() => {
     fetchModules();
-  }, []);
+  }, [user?.role]);
 
   const fetchModules = async () => {
     try {

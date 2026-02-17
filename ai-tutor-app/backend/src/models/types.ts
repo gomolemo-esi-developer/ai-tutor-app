@@ -18,6 +18,8 @@ export interface User {
   bio?: string;
   phone?: string;
   profilePicture?: string;
+  profilePictureUrl?: string; // S3 URL to profile picture
+  profilePictureKey?: string; // S3 key for management
 }
 
 /**

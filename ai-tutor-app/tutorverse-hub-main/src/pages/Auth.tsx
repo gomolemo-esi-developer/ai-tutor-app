@@ -49,15 +49,26 @@ const Auth: React.FC = () => {
         setShowQuickLoginModal(true);
     };
 
-    // Quick login - generate instant access link for existing students/educators
+    // Quick login - generate instant access link for existing students/educators/admins
     const handleQuickLoginSubmit = async (registrationNumber: string) => {
         setIsLoading(true);
         try {
             const { apiClient } = await import('@/lib/api');
-            const response = await apiClient.post('/api/auth/quick-link-existing', {
-                [quickLoginRole === 'educator' ? 'staffNumber' : 'studentNumber']: registrationNumber,
+            
+            const payload: any = {
                 role: quickLoginRole.toUpperCase(),
-            }, { skipAuth: true });
+            };
+
+            // Add appropriate identifier based on role
+            if (quickLoginRole === 'admin') {
+                payload.email = registrationNumber;
+            } else if (quickLoginRole === 'educator') {
+                payload.staffNumber = registrationNumber;
+            } else {
+                payload.studentNumber = registrationNumber;
+            }
+
+            const response = await apiClient.post('/api/auth/quick-link-existing', payload, { skipAuth: true });
 
             if (response?.link) {
                 toast({
@@ -313,45 +324,45 @@ const Auth: React.FC = () => {
                 <div className="absolute top-0 right-0 w-96 h-96 bg-white/5 rounded-full -translate-y-1/2 translate-x-1/2" />
                 <div className="absolute bottom-0 left-0 w-64 h-64 bg-white/5 rounded-full translate-y-1/2 -translate-x-1/2" />
 
-                <div className="relative z-10">
+                <div className="relative z-10 flex flex-col h-full">
                     <div className="flex items-center gap-3 mb-12">
-                        <div className="w-12 h-12 rounded-2xl bg-white/20 backdrop-blur-sm flex items-center justify-center shadow-lg">
-                            <Sparkles className="w-6 h-6 text-white" />
-                        </div>
-                        <div>
-                            <h1 className="text-2xl font-display font-bold text-white tracking-tight">AI TUTOR</h1>
-                            <p className="text-sm text-white/70">Tshwane University of Technology</p>
-                        </div>
-                    </div>
+                         <div className="w-12 h-12 rounded-2xl bg-white/20 backdrop-blur-sm flex items-center justify-center shadow-lg">
+                             <Sparkles className="w-6 h-6 text-white" />
+                         </div>
+                         <div>
+                             <h1 className="text-2xl font-display font-bold text-white tracking-tight">AI TUTOR</h1>
+                             <p className="text-sm text-white/70">Tshwane University of Technology</p>
+                         </div>
+                     </div>
 
-                    <div className="flex-1 flex flex-col justify-center">
-                        <h2 className="text-4xl font-display font-bold text-white mb-6 leading-tight tracking-tight">
-                            Discover the future
-                            <br />
-                            of education with
-                            <br />
-                            <span className="text-white/90">AI-powered learning</span>
-                        </h2>
-                        <p className="text-white/80 text-lg mb-10 max-w-md leading-relaxed">
-                            Experience personalized tutoring, intelligent content generation, and seamless learning management all in one
-                            platform.
-                        </p>
-                    </div>
+                    <div>
+                         <h2 className="text-4xl font-display font-bold text-white mb-6 leading-tight tracking-tight">
+                             Discover the future
+                             <br />
+                             of education with
+                             <br />
+                             <span className="text-white/90">AI-powered learning</span>
+                         </h2>
+                         <p className="text-white/80 text-lg mb-10 max-w-md leading-relaxed">
+                             Experience personalized tutoring, intelligent content generation, and seamless learning management all in one
+                             platform.
+                         </p>
+                     </div>
 
-                    <div className="flex gap-8">
-                        <div className="flex items-center gap-3 text-white/80">
-                            <div className="w-10 h-10 rounded-xl bg-white/10 flex items-center justify-center">
-                                <Shield className="w-5 h-5 text-white" />
-                            </div>
-                            <span className="text-sm font-medium">Secure Access</span>
-                        </div>
-                        <div className="flex items-center gap-3 text-white/80">
-                            <div className="w-10 h-10 rounded-xl bg-white/10 flex items-center justify-center">
-                                <Clock className="w-5 h-5 text-white" />
-                            </div>
-                            <span className="text-sm font-medium">24/7 Support</span>
-                        </div>
-                    </div>
+                    <div className="flex gap-8 mt-auto">
+                         <div className="flex items-center gap-3 text-white/80">
+                             <div className="w-10 h-10 rounded-xl bg-white/10 flex items-center justify-center">
+                                 <Shield className="w-5 h-5 text-white" />
+                             </div>
+                             <span className="text-sm font-medium">Secure Access</span>
+                         </div>
+                         <div className="flex items-center gap-3 text-white/80">
+                             <div className="w-10 h-10 rounded-xl bg-white/10 flex items-center justify-center">
+                                 <Clock className="w-5 h-5 text-white" />
+                             </div>
+                             <span className="text-sm font-medium">24/7 Support</span>
+                         </div>
+                     </div>
                 </div>
             </div>
 

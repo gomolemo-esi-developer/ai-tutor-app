@@ -60,10 +60,10 @@ def generate_chat_response(
             params["temperature"] = 0.7
             params["max_tokens"] = -1
         elif current_model.startswith("gpt-5"):
-            params["max_completion_tokens"] = 1000
+            params["max_completion_tokens"] = 2500  # Increased from 1000
         else:
             params["temperature"] = 0.7
-            params["max_tokens"] = 1000
+            params["max_tokens"] = 2500  # Increased from 1000 for more comprehensive responses
         
         response = client.chat.completions.create(**params)
         
