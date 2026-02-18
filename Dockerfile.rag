@@ -44,12 +44,19 @@ RUN chown -R python:python /app/data \
 # Allow python user to write to system temp (for ffmpeg, pandoc, etc.)
 RUN chmod 1777 /tmp
 
+# Create cache directories with proper permissions before switching user
+RUN mkdir -p /app/temp/hf_cache /app/temp/torch_cache /app/temp/transformers_cache && \
+    chown -R python:python /app/temp
+
 USER python
 
-# Set temp directories
+# Set temp and cache directories for all tools
 ENV TMPDIR=/app/temp \
     TEMP=/app/temp \
-    TMP=/app/temp
+    TMP=/app/temp \
+    HF_HOME=/app/temp/hf_cache \
+    TORCH_HOME=/app/temp/torch_cache \
+    TRANSFORMERS_CACHE=/app/temp/transformers_cache
 
 # Set environment variables
 ENV PYTHONUNBUFFERED=1 \
