@@ -317,21 +317,21 @@ const EducatorModuleFiles: React.FC = () => {
     }
   };
 
-  if (!module) {
-    return (
-      <MainLayout>
-        <div className="flex-1 flex items-center justify-center">
-          <p className="text-muted-foreground">Module not found</p>
-        </div>
-      </MainLayout>
-    );
-  }
-
   if (loading) {
     return (
       <MainLayout>
         <div className="flex-1 flex items-center justify-center">
           <LoadingSpinner message="Loading files..." />
+        </div>
+      </MainLayout>
+    );
+  }
+
+  if (!module) {
+    return (
+      <MainLayout>
+        <div className="flex-1 flex items-center justify-center">
+          <p className="text-muted-foreground">Module not found</p>
         </div>
       </MainLayout>
     );

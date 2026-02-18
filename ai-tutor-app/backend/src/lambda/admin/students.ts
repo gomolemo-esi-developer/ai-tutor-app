@@ -76,8 +76,6 @@ export async function handleCreateStudent(event: APIGatewayProxyEvent): Promise<
       userId: UuidUtil.generateWithPrefix('user'),
       studentNumber: input.studentNumber,
       email: input.email,
-      firstName: input.firstName,
-      lastName: input.lastName,
       title: input.title,
       departmentId: input.departmentId,
       campusId: input.campusId,

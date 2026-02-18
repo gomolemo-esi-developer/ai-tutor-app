@@ -74,8 +74,6 @@ export async function handleCreateLecturer(event: APIGatewayProxyEvent): Promise
       userId: UuidUtil.generateWithPrefix('user'),
       staffNumber: input.staffNumber,
       email: input.email,
-      firstName: input.firstName,
-      lastName: input.lastName,
       title: input.title,
       departmentId: input.departmentId,
       campusId: input.campusId,

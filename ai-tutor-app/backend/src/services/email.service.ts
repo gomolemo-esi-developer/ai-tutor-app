@@ -10,7 +10,7 @@ import { CryptoUtil } from '../utils/crypto.util';
  */
 export class EmailService {
   private static sesClient = new SESClient({ region: EnvConfig.get('AWS_REGION') });
-  private static senderEmail = process.env.SES_SENDER_EMAIL || 'noreply@tutorverse.university';
+  private static senderEmail = process.env.SES_SENDER_EMAIL || 'sibiyag@tut.ac.za';
 
   /**
    * Generate 6-digit verification PIN
@@ -145,7 +145,6 @@ This link will expire in 24 hours. If you did not request this verification, ple
    */
   static async sendVerificationCode(
     recipientEmail: string,
-    firstName: string = 'User',
     code: string
   ): Promise<void> {
     // In development, log code to console for testing
@@ -178,7 +177,7 @@ This link will expire in 24 hours. If you did not request this verification, ple
                 <p>Email Verification</p>
               </div>
               <div class="content">
-                <p>Hello ${firstName},</p>
+                <p>Hello,</p>
                 <p>Thank you for registering with TutorVerse. Please use the code below to verify your email address:</p>
                 <div class="code-box">
                   <div class="code">${code}</div>
@@ -195,7 +194,7 @@ This link will expire in 24 hours. If you did not request this verification, ple
       `;
 
       const plainTextContent = `
-Hello ${firstName},
+Hello,
 
 Thank you for registering with TutorVerse. Please use the code below to verify your email address:
 

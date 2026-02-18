@@ -12,8 +12,6 @@ export const registerSchema = z.object({
     .regex(/[a-z]/, 'Password must contain lowercase letter')
     .regex(/[0-9]/, 'Password must contain number')
     .regex(/[!@#$%^&*]/, 'Password must contain special character'),
-  firstName: z.string().min(2, 'First name required'),
-  lastName: z.string().min(2, 'Last name required'),
   role: z.enum(['ADMIN', 'EDUCATOR', 'STUDENT']),
   staffNumber: z.string().min(1, 'Staff number required for educators').optional(),
   studentNumber: z.string().min(1, 'Student number required for students').optional(),
@@ -30,8 +28,8 @@ export const refreshTokenSchema = z.object({
 });
 
 export const updateProfileSchema = z.object({
-  firstName: z.string().min(2).optional(),
-  lastName: z.string().min(2).optional(),
+  firstName: z.string().optional(),
+  lastName: z.string().optional(),
   phone: z.string().regex(/^\+?[0-9\s\-()]+$/, 'Invalid phone number').optional(),
   profileImageUrl: z.string().url().optional(),
   bio: z.string().optional(),
@@ -67,8 +65,8 @@ export const changePasswordSchema = z.object({
 export const createLecturerSchema = z.object({
   staffNumber: z.string().min(1, 'Staff number required'),
   email: z.string().email('Invalid email'),
-  firstName: z.string().min(2, 'First name required'),
-  lastName: z.string().min(2, 'Last name required'),
+  firstName: z.string().optional(),
+  lastName: z.string().optional(),
   title: z.enum(['Mr', 'Ms', 'Mrs', 'Dr', 'Prof']).optional(),
   departmentId: z.string().min(1, 'Department ID required'),
   campusId: z.string().min(1, 'Campus ID required'),
@@ -86,8 +84,8 @@ export const updateLecturerSchema = createLecturerSchema.partial();
 export const createStudentSchema = z.object({
   studentNumber: z.string().min(1, 'Student number required'),
   email: z.string().email('Invalid email'),
-  firstName: z.string().min(2, 'First name required'),
-  lastName: z.string().min(2, 'Last name required'),
+  firstName: z.string().optional(),
+  lastName: z.string().optional(),
   title: z.enum(['Mr', 'Ms', 'Mrs', 'Dr', 'Prof']).optional(),
   departmentId: z.string().min(1, 'Department ID required'),
   campusId: z.string().min(1, 'Campus ID required'),

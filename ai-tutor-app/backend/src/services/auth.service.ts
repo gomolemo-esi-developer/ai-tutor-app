@@ -40,8 +40,6 @@ export class AuthService {
   static async registerUser(
     email: string,
     password: string,
-    firstName: string,
-    lastName: string,
     role: UserRole
   ): Promise<User> {
     try {
@@ -56,8 +54,6 @@ export class AuthService {
         // Don't specify MessageAction - Cognito will send verification email
         UserAttributes: [
           { Name: 'email', Value: email },
-          { Name: 'given_name', Value: firstName },
-          { Name: 'family_name', Value: lastName },
         ],
       });
 
@@ -113,8 +109,6 @@ export class AuthService {
       const user: User = {
         userId,
         email,
-        firstName,
-        lastName,
         role,
         isActivated: false,
         createdAt: now,
@@ -129,7 +123,7 @@ export class AuthService {
       try {
         const code = EmailService.generateVerificationCode();
         await VerificationService.storeVerificationCode(email, code);
-        await EmailService.sendVerificationCode(email, firstName, code);
+        await EmailService.sendVerificationCode(email, code);
         LoggerUtil.debug(`Verification code sent`, { email });
       } catch (emailError) {
         LoggerUtil.warn('Failed to send verification code', { email, error: emailError });
@@ -215,8 +209,6 @@ export class AuthService {
         user: {
           userId: userData.userId,
           email: userData.email,
-          firstName: userData.firstName,
-          lastName: userData.lastName,
           role: userData.role,
           profilePictureUrl: userData.profilePictureUrl,
         },
@@ -358,8 +350,6 @@ export class AuthService {
   static async registerUserWithActivation(
     email: string,
     password: string,
-    firstName: string,
-    lastName: string,
     role: UserRole,
     staffOrStudentNumber: string,
     departmentId?: string
@@ -387,8 +377,6 @@ export class AuthService {
         // Don't specify MessageAction - Cognito will send verification email
         UserAttributes: [
           { Name: 'email', Value: email },
-          { Name: 'given_name', Value: firstName },
-          { Name: 'family_name', Value: lastName },
         ],
       });
 
@@ -441,8 +429,6 @@ export class AuthService {
       const user: User = {
         userId,
         email,
-        firstName,
-        lastName,
         role,
         isActivated: false, // Not activated until email verified
         createdAt: now,
@@ -486,7 +472,7 @@ export class AuthService {
       try {
         const code = EmailService.generateVerificationCode();
         await VerificationService.storeVerificationCode(email, code);
-        await EmailService.sendVerificationCode(email, firstName, code);
+        await EmailService.sendVerificationCode(email, code);
         LoggerUtil.debug(`Verification code sent`, { email });
       } catch (emailError) {
         LoggerUtil.warn('Failed to send verification code', { email, error: emailError });

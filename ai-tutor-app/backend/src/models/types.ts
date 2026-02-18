@@ -6,8 +6,8 @@ export type UserRole = 'ADMIN' | 'EDUCATOR' | 'STUDENT';
 export interface User {
   userId: string;
   email: string;
-  firstName: string;
-  lastName: string;
+  firstName?: string;
+  lastName?: string;
   role: UserRole;
   isActivated: boolean;
   createdAt: number; // Unix milliseconds
@@ -30,8 +30,8 @@ export interface Lecturer {
   userId: string; // FK to Users (required after activation)
   staffNumber: string; // Unique identifier
   email: string; // Indexed, required
-  firstName: string;
-  lastName: string;
+  firstName?: string;
+  lastName?: string;
   title?: string; // Mr, Ms, Mrs, Dr, Prof
   departmentId: string; // FK to Departments (required)
   campusId: string; // FK to Campuses (required)
@@ -54,8 +54,8 @@ export interface Student {
   userId: string; // FK to Users (required after activation)
   studentNumber: string; // Unique identifier
   email: string; // Indexed, required
-  firstName: string;
-  lastName: string;
+  firstName?: string;
+  lastName?: string;
   title?: string; // Mr, Ms, Mrs, Dr, Prof
   departmentId: string; // FK to Departments (required)
   campusId: string; // FK to Campuses (required)

@@ -20,14 +20,12 @@ import { DynamoDBService } from '../../services/dynamodb.service';
  * 5. Returns user info + linked record
  *
  * Request:
- * {
- *   "email": "john@university.edu",
- *   "password": "SecurePass123!",
- *   "firstName": "John",
- *   "lastName": "Doe",
- *   "role": "EDUCATOR",
- *   "staffNumber": "E001"  // Required for EDUCATOR
- * }
+  * {
+  *   "email": "john@university.edu",
+  *   "password": "SecurePass123!",
+  *   "role": "EDUCATOR",
+  *   "staffNumber": "E001"  // Required for EDUCATOR
+  * }
  */
 export async function handleRegisterActivation(
   event: APIGatewayProxyEvent
@@ -57,8 +55,6 @@ export async function handleRegisterActivation(
     const result = await AuthService.registerUserWithActivation(
       input.email,
       input.password,
-      input.firstName,
-      input.lastName,
       input.role,
       staffOrStudentNumber,
       input.departmentId
@@ -78,8 +74,6 @@ export async function handleRegisterActivation(
           user: {
             userId: result.user.userId,
             email: result.user.email,
-            firstName: result.user.firstName,
-            lastName: result.user.lastName,
             role: result.user.role,
             isActivated: result.user.isActivated,
           },

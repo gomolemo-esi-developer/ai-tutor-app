@@ -8,14 +8,10 @@ export interface User {
   userId: string;
   email: string;
   role: UserRole;
-  firstName?: string;
-  lastName?: string;
   profilePictureUrl?: string;
 }
 
 export interface RegisterData {
-  firstName: string;
-  lastName: string;
   email: string;
   password: string;
   role: UserRole;
@@ -47,22 +43,16 @@ const mockUsers: Record<string, User> = {
     userId: 'student-123',
     email: 'student@test.com',
     role: 'student',
-    firstName: 'John',
-    lastName: 'Student',
   },
   'educator@test.com': {
     userId: 'educator-456',
     email: 'educator@test.com',
     role: 'educator',
-    firstName: 'Jane',
-    lastName: 'Educator',
   },
   'admin@test.com': {
     userId: 'admin-789',
     email: 'admin@test.com',
     role: 'admin',
-    firstName: 'Admin',
-    lastName: 'User',
   },
 };
 
@@ -126,8 +116,6 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
             userId: response.user?.userId || response.userId,
             email: response.user?.email || response.email,
             role: (response.user?.role || response.role) as UserRole,
-            firstName: response.user?.firstName || response.firstName,
-            lastName: response.user?.lastName || response.lastName,
             profilePictureUrl: response.user?.profilePictureUrl || response.profilePictureUrl,
           };
 
@@ -182,8 +170,6 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
           userId: response.userId,
           email: response.email,
           role: response.role as UserRole,
-          firstName: data.firstName,
-          lastName: data.lastName,
         };
 
         localStorage.setItem('user', JSON.stringify(userData));
@@ -197,8 +183,6 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
           userId: `user-${Date.now()}`,
           email: data.email,
           role: data.role,
-          firstName: data.firstName,
-          lastName: data.lastName,
         };
 
         localStorage.setItem('user', JSON.stringify(newUser));

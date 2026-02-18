@@ -21,8 +21,6 @@ const Auth: React.FC = () => {
     const [isActivation, setIsActivation] = useState(false);
     const [email, setEmail] = useState('');
     const [password, setPassword] = useState('');
-    const [firstName, setFirstName] = useState('');
-    const [lastName, setLastName] = useState('');
     const [staffNumber, setStaffNumber] = useState('');
     const [studentNumber, setStudentNumber] = useState('');
     const [showPassword, setShowPassword] = useState(false);
@@ -37,11 +35,15 @@ const Auth: React.FC = () => {
     const { toast } = useToast();
 
     // Default to student role if none selected
+    // Always use activation mode when not in login
     useEffect(() => {
         if (!selectedRole) {
             setSelectedRole('student');
         }
-    }, [selectedRole, setSelectedRole]);
+        if (!isLogin) {
+            setIsActivation(true);
+        }
+    }, [selectedRole, setSelectedRole, isLogin]);
 
     // Open quick login modal
     const openQuickLoginModal = (role: UserRole) => {
@@ -125,8 +127,6 @@ const Auth: React.FC = () => {
                     const response = await apiClient.post('/api/auth/register-activation', {
                         email,
                         password,
-                        firstName,
-                        lastName,
                         role: roleToUse.toUpperCase(),
                         staffNumber: roleToUse === 'educator' ? staffNumber : undefined,
                         studentNumber: roleToUse === 'student' ? studentNumber : undefined,
@@ -156,28 +156,10 @@ const Auth: React.FC = () => {
                     setIsLoading(false);
                     return;
                 }
-            } else {
-                // Registration flow
-                success = await register({
-                    email,
-                    password,
-                    firstName,
-                    lastName,
-                    role: roleToUse,
-                });
             }
 
             if (success) {
-                if (!isLogin && !isActivation) {
-                    // Registration successful - show verification page
-                    setVerificationEmail(email);
-                    sessionStorage.setItem('tempUserData', JSON.stringify({ password }));
-                    setShowVerification(true);
-                    toast({
-                        title: 'Account created!',
-                        description: 'Please verify your email to continue.',
-                    });
-                } else if (isActivation) {
+                if (isActivation) {
                     // Activation successful - show verification page
                     setVerificationEmail(email);
                     sessionStorage.setItem('tempUserData', JSON.stringify({ password }));
@@ -243,8 +225,6 @@ const Auth: React.FC = () => {
         // Reset form fields
         setEmail('');
         setPassword('');
-        setFirstName('');
-        setLastName('');
         setIsLogin(true);
     };
 
@@ -314,10 +294,10 @@ const Auth: React.FC = () => {
     }
 
     return (
-        <div className="min-h-screen flex bg-background">
+        <div className="h-screen flex bg-background lg:flex-row overflow-hidden">
             {/* Left Panel - Branding with Gradient */}
             <div
-                className="hidden lg:flex lg:w-2/5 flex-col p-10 relative overflow-hidden"
+                className="hidden lg:flex lg:w-2/5 flex-col p-10 relative overflow-hidden fixed left-0 top-0 h-screen"
                 style={{ background: 'var(--gradient-hero)' }}
             >
                 {/* Decorative elements */}
@@ -367,8 +347,9 @@ const Auth: React.FC = () => {
             </div>
 
             {/* Center Panel - Auth Form */}
-            <div className="flex-1 flex items-center justify-center p-6 md:p-10">
-                <div className="w-full max-w-md animate-fade-in">
+            <div className="flex-1 overflow-y-auto h-screen lg:w-3/5 lg:ml-auto">
+                <div className="flex items-center justify-center min-h-screen p-6 md:p-10 w-full">
+                    <div className="w-full max-w-md animate-fade-in">
                     <div className="lg:hidden flex items-center gap-3 mb-10 justify-center">
                         <div className="w-12 h-12 rounded-2xl bg-primary/10 flex items-center justify-center">
                             <Sparkles className="w-6 h-6 text-primary" />
@@ -378,49 +359,16 @@ const Auth: React.FC = () => {
 
                     <div className="text-center lg:text-left mb-8">
                         <h2 className="text-3xl font-display font-bold text-foreground mb-2 tracking-tight">
-                            {isLogin ? 'Welcome Back' : isActivation ? 'Activate Account' : 'Create Account'}
+                            {isLogin ? 'Welcome Back' : 'Activate Account'}
                         </h2>
                         <p className="text-muted-foreground">
                             {isLogin
                                 ? 'Enter your credentials to access your account'
-                                : isActivation
-                                    ? 'Activate your pre-created account with your credentials'
-                                    : 'Fill in your details to get started'}
+                                : 'Activate your pre-created account with your credentials'}
                         </p>
                     </div>
 
-                    {/* Activation Toggle - Show only when not login */}
-                    {!isLogin && (
-                        <div className="mb-6 p-3 rounded-lg bg-purple-500/10 border border-purple-500/20">
-                            <p className="text-xs text-muted-foreground mb-2">Registration Type</p>
-                            <div className="flex gap-2">
-                                <button
-                                    type="button"
-                                    onClick={() => setIsActivation(false)}
-                                    className={cn(
-                                        'flex-1 px-3 py-2 rounded-lg text-sm font-medium transition-all',
-                                        !isActivation
-                                            ? 'bg-primary text-white'
-                                            : 'bg-muted text-muted-foreground hover:text-foreground'
-                                    )}
-                                >
-                                    New Account
-                                </button>
-                                <button
-                                    type="button"
-                                    onClick={() => setIsActivation(true)}
-                                    className={cn(
-                                        'flex-1 px-3 py-2 rounded-lg text-sm font-medium transition-all',
-                                        isActivation
-                                            ? 'bg-primary text-white'
-                                            : 'bg-muted text-muted-foreground hover:text-foreground'
-                                    )}
-                                >
-                                    Activate Pre-created
-                                </button>
-                            </div>
-                        </div>
-                    )}
+
 
                     {/* Role Selection - Inline */}
                     <div className="mb-6">
@@ -486,30 +434,6 @@ const Auth: React.FC = () => {
                                         />
                                     </div>
                                 )}
-                                <div className="space-y-2">
-                                    <Label htmlFor="firstName">First Name</Label>
-                                    <Input
-                                        id="firstName"
-                                        type="text"
-                                        placeholder="Enter your first name"
-                                        value={firstName}
-                                        onChange={(e) => setFirstName(e.target.value)}
-                                        required={!isLogin}
-                                        className="h-12"
-                                    />
-                                </div>
-                                <div className="space-y-2">
-                                    <Label htmlFor="lastName">Last Name</Label>
-                                    <Input
-                                        id="lastName"
-                                        type="text"
-                                        placeholder="Enter your last name"
-                                        value={lastName}
-                                        onChange={(e) => setLastName(e.target.value)}
-                                        required={!isLogin}
-                                        className="h-12"
-                                    />
-                                </div>
                             </>
                         )}
 
@@ -549,28 +473,28 @@ const Auth: React.FC = () => {
                         </div>
 
                         <Button type="submit" size="lg" className="w-full h-12 text-base font-medium" disabled={isLoading}>
-                            {isLoading ? 'Please wait...' : isLogin ? 'Sign In' : isActivation ? 'Activate Account' : 'Create Account'}
+                            {isLoading ? 'Please wait...' : isLogin ? 'Sign In' : 'Activate Account'}
                         </Button>
                     </form>
 
-                    <p className="text-center text-muted-foreground mt-8">
-                        {isLogin ? "Don't have an account?" : 'Already have an account?'}
-                        <button
-                            onClick={() => {
-                                setIsLogin(!isLogin);
-                                setIsActivation(false);
-                                setEmail('');
-                                setPassword('');
-                                setFirstName('');
-                                setLastName('');
-                                setStaffNumber('');
-                                setStudentNumber('');
-                            }}
-                            className="text-primary font-semibold ml-1.5 hover:underline"
-                        >
-                            {isLogin ? 'Sign Up' : 'Sign In'}
-                        </button>
-                    </p>
+                    {!(isActivation && selectedRole === 'admin') && (
+                        <p className="text-center text-muted-foreground mt-8">
+                            {isLogin ? 'Need to activate an account?' : 'Already have an account?'}
+                            <button
+                                onClick={() => {
+                                    setIsLogin(!isLogin);
+                                    setEmail('');
+                                    setPassword('');
+                                    setStaffNumber('');
+                                    setStudentNumber('');
+                                }}
+                                className="text-primary font-semibold ml-1.5 hover:underline"
+                            >
+                                {isLogin ? 'Activate' : 'Sign In'}
+                            </button>
+                        </p>
+                    )}
+                    </div>
                 </div>
             </div>
 

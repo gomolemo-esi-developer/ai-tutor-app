@@ -333,7 +333,7 @@ app.post('/api/educator/files/upload-link',
 );
 // Direct upload proxy - bypass CORS by uploading through backend
 // Configure raw body parser for upload endpoint (must be before route definition)
-const uploadMiddleware = express.raw({ type: 'application/octet-stream', limit: '100MB' });
+const uploadMiddleware = express.raw({ type: 'application/octet-stream', limit: '500MB' });
 
 app.post('/api/educator/files/upload',
   uploadMiddleware,
@@ -343,10 +343,18 @@ app.post('/api/educator/files/upload',
     const userId = req.user?.sub || (req as any).userId;
     const fileId = req.headers['x-file-id'] as string;
     const moduleCode = req.headers['x-module-code'] as string;
-    const fileName = req.headers['x-file-name'] as string;
+    let fileName = req.headers['x-file-name'] as string;
     
     if (!userId || !fileId || !moduleCode || !fileName) {
       return res.status(400).json({ error: 'Missing required headers' });
+    }
+
+    // Decode URL-encoded filename (handles special characters and emojis)
+    try {
+      fileName = decodeURIComponent(fileName);
+    } catch (e) {
+      // If decoding fails, use the original filename
+      console.warn('Failed to decode filename, using original:', fileName);
     }
 
     const { S3Service } = await import('./services/s3.service');

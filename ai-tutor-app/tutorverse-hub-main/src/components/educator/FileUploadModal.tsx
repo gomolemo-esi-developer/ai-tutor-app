@@ -97,7 +97,7 @@ const VALID_FILE_TYPES = [
     'application/x-java-source',
 ];
 
-const MAX_FILE_SIZE = 25 * 1024 * 1024; // 25MB
+const MAX_FILE_SIZE = 500 * 1024 * 1024; // 500MB
 
 export const FileUploadModal: React.FC<FileUploadModalProps> = ({
     isOpen,
@@ -159,6 +159,13 @@ export const FileUploadModal: React.FC<FileUploadModalProps> = ({
 
     const handleFileSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
         const files = Array.from(e.target.files || []);
+        
+        // Only allow one file at a time
+        if (files.length > 1) {
+            setError('Please select only one file at a time.');
+            return;
+        }
+
         const validFiles = files.filter((file) => {
             const isValidType = VALID_FILE_TYPES.includes(file.type);
             const isValidSize = file.size <= MAX_FILE_SIZE;
@@ -167,10 +174,12 @@ export const FileUploadModal: React.FC<FileUploadModalProps> = ({
 
         if (validFiles.length < files.length) {
             setError(
-                'Some files were rejected. Check file type and size (max 25MB).'
+                'File was rejected. Check file type and size (max 500MB).'
             );
+            return;
         }
 
+        // Clear previous files and add only the new one
         const newUploadFiles: UploadFile[] = validFiles.map((file) => ({
             file,
             id: `${Date.now()}-${Math.random()}`,
@@ -178,9 +187,9 @@ export const FileUploadModal: React.FC<FileUploadModalProps> = ({
             status: 'pending',
         }));
 
-        setUploadFiles((prev) => [...prev, ...newUploadFiles]);
+        setUploadFiles(newUploadFiles);
 
-        // Auto-detect content type for first file
+        // Auto-detect content type for the file
         if (validFiles.length > 0 && !metadata.contentType) {
             const detectedType = detectContentType(
                 validFiles[0].name,
@@ -355,7 +364,8 @@ export const FileUploadModal: React.FC<FileUploadModalProps> = ({
                         xhr.setRequestHeader('Content-Type', 'application/octet-stream');
                         xhr.setRequestHeader('X-File-ID', fileId);
                         xhr.setRequestHeader('X-Module-Code', moduleCodeToUse);
-                        xhr.setRequestHeader('X-File-Name', uf.file.name);
+                        // Encode filename to ISO-8859-1 compatible format by URL encoding
+                        xhr.setRequestHeader('X-File-Name', encodeURIComponent(uf.file.name));
                         if (token) {
                             xhr.setRequestHeader('Authorization', `Bearer ${token}`);
                         }
@@ -519,14 +529,13 @@ export const FileUploadModal: React.FC<FileUploadModalProps> = ({
                         <div className={styles.uploadArea}>
                             <Upload className={styles.uploadIcon} />
                             <p className={styles.uploadText}>
-                                Drag files here or click to browse
+                                Drag a file here or click to browse
                             </p>
                             <p className={styles.uploadSubtext}>
-                                Max 25MB per file (PDF, PPT, DOC, Images, Video, Audio, Code)
+                                Max 500MB per file (PDF, PPT, DOC, Images, Video, Audio, Code)
                             </p>
                             <input
                                 type="file"
-                                multiple
                                 onChange={handleFileSelect}
                                 accept=".pdf,.doc,.docx,.ppt,.pptx,.xls,.xlsx,.csv,.txt,.jpg,.jpeg,.png,.gif,.bmp,.tiff,.webp,.mp3,.wav,.m4a,.flac,.ogg,.mp4,.avi,.mov,.mkv,.webm,.js,.ts,.jsx,.tsx,.py,.java,.cpp,.c,.cs,.go,.rs,.rb,.php,.swift,.kt,.scala,.r,.m,.mm"
                                 className={styles.fileInput}
@@ -536,7 +545,7 @@ export const FileUploadModal: React.FC<FileUploadModalProps> = ({
                         {uploadFiles.length > 0 && (
                             <div className={styles.filesList}>
                                 <p className={styles.filesListTitle}>
-                                    Files Selected ({uploadFiles.length})
+                                    File Selected
                                 </p>
                                 {uploadFiles.map((uf) => (
                                     <div key={uf.id} className={styles.fileItem}>
