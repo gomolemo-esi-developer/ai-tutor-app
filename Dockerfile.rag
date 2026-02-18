@@ -30,14 +30,26 @@ RUN mkdir -p /app/data \
 # Create non-root user for security
 RUN groupadd -r python && useradd -r -g python python
 
+# Create temp directory for the python user
+RUN mkdir -p /app/temp && chown -R python:python /app/temp
+
 # Fix permissions so python user can write to all directories
 RUN chown -R python:python /app/data \
     /app/chroma_db \
     /app/conversion \
     /app/conversion/output \
-    /app/conversion/models
+    /app/conversion/models \
+    /app/temp
+
+# Allow python user to write to system temp (for ffmpeg, pandoc, etc.)
+RUN chmod 1777 /tmp
 
 USER python
+
+# Set temp directories
+ENV TMPDIR=/app/temp \
+    TEMP=/app/temp \
+    TMP=/app/temp
 
 # Set environment variables
 ENV PYTHONUNBUFFERED=1 \
