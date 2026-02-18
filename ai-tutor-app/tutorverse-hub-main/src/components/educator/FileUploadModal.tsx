@@ -364,8 +364,9 @@ export const FileUploadModal: React.FC<FileUploadModalProps> = ({
                         xhr.setRequestHeader('Content-Type', 'application/octet-stream');
                         xhr.setRequestHeader('X-File-ID', fileId);
                         xhr.setRequestHeader('X-Module-Code', moduleCodeToUse);
-                        // Encode filename to ISO-8859-1 compatible format by URL encoding
-                        xhr.setRequestHeader('X-File-Name', encodeURIComponent(uf.file.name));
+                        // Encode filename to ASCII-safe format using URL encoding (handles emojis like 🔊)
+                        const encodedFileName = encodeURIComponent(uf.file.name);
+                        xhr.setRequestHeader('X-File-Name', encodedFileName);
                         if (token) {
                             xhr.setRequestHeader('Authorization', `Bearer ${token}`);
                         }
