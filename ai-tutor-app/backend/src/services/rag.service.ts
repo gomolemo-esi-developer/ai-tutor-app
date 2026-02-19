@@ -113,113 +113,101 @@ export class RAGService {
                     ? `/educator/upload?callback_url=${encodeURIComponent(callbackUrl)}`
                     : '/educator/upload';
 
-                // FIX: Use responseType 'stream' to handle NDJSON streaming response properly
+                // FIX (2026-02-19): Simplify response handling
+                // Use axios default behavior which buffers the response
+                // Then parse the NDJSON response as text
                 const response = await this.client.post(uploadUrl, formData, {
                     headers: { 'Content-Type': 'multipart/form-data' },
-                    responseType: 'stream'
+                    // Let axios handle response buffering/parsing
+                    // Since we expect NDJSON, we need to handle it specially
+                    validateStatus: () => true  // Don't throw on any status code
                 });
 
-                // Parse ndjson response stream (each line is a status update)
-                // The stream includes: uploading, detecting, converting, conversion_complete, embedding, complete
-                return await new Promise((resolve, reject) => {
-                    let buffer = '';
-                    let completeData: any = null;
+                // Parse ndjson response - response.data should be a string containing newline-delimited JSON
+                const responseText = typeof response.data === 'string'
+                    ? response.data
+                    : JSON.stringify(response.data);
 
-                    response.data.on('data', (chunk: Buffer) => {
-                        buffer += chunk.toString('utf-8');
-                        const lines = buffer.split('\n');
+                const lines = responseText.split('\n').filter((l: string) => l.trim());
+                if (lines.length === 0) {
+                    throw new Error('RAG response is empty');
+                }
 
-                        // Keep the incomplete last line in buffer
-                        buffer = lines.pop() || '';
+                // Parse all lines and find the complete status
+                let completeData: any = null;
+                let lastError: string | null = null;
 
-                        for (const line of lines) {
-                            if (!line.trim()) continue;
+                for (const line of lines) {
+                    try {
+                        const parsed = JSON.parse(line);
 
-                            try {
-                                const parsed = JSON.parse(line);
+                        if (parsed.status === 'error') {
+                            lastError = parsed.message || 'RAG upload failed';
+                            continue;
+                        }
 
-                                if (parsed.status === 'error') {
-                                    reject(new Error(parsed.message || 'RAG upload failed'));
-                                    return;
-                                }
+                        // Track any line with document_id, but prefer 'complete' status
+                        if (parsed.document_id) {
+                            completeData = parsed;
+                            LoggerUtil.info('[RAG] Processing status', {
+                                status: parsed.status,
+                                progress: parsed.progress
+                            });
 
-                                // Look for completion or status with document_id
-                                if (parsed.status === 'complete' || parsed.document_id) {
-                                    completeData = parsed;
-                                    LoggerUtil.info('[RAG] Status update', {
-                                        status: parsed.status,
-                                        progress: parsed.progress,
-                                        message: parsed.message
-                                    });
-                                }
-                            } catch (parseError) {
-                                LoggerUtil.warn('[RAG] Failed to parse response line', {
-                                    line: line.substring(0, 100)
-                                });
+                            // Break on complete status
+                            if (parsed.status === 'complete') {
+                                break;
                             }
                         }
-                    });
-
-                    response.data.on('end', () => {
-                        // Process any remaining content in buffer
-                        if (buffer.trim()) {
-                            try {
-                                const parsed = JSON.parse(buffer);
-                                if (parsed.status === 'complete' || parsed.document_id) {
-                                    completeData = parsed;
-                                }
-                            } catch (e) {
-                                LoggerUtil.warn('[RAG] Failed to parse final response', { buffer: buffer.substring(0, 100) });
-                            }
-                        }
-
-                        // Validate final response
-                        if (!completeData || typeof completeData !== 'object') {
-                            reject(new Error('RAG response is not a valid object'));
-                            return;
-                        }
-
-                        if (!completeData.document_id) {
-                            reject(new Error(`RAG response missing document_id - final status was: ${completeData.status}`));
-                            return;
-                        }
-
-                        if (completeData.status === 'error') {
-                            reject(new Error(completeData.message || 'RAG upload failed'));
-                            return;
-                        }
-
-                        if (completeData.chunks === undefined || completeData.chunks === null) {
-                            reject(new Error('RAG response missing chunk count'));
-                            return;
-                        }
-
-                        if (typeof completeData.chunks !== 'number' || completeData.chunks < 0) {
-                            reject(new Error(`RAG response has invalid chunk count: ${completeData.chunks}`));
-                            return;
-                        }
-
-                        LoggerUtil.info('[RAG] Upload successful', {
-                            fileName,
-                            documentId: completeData.document_id,
-                            chunks: completeData.chunks,
-                            textLength: completeData.text_length,
-                            fileType: completeData.file_type
+                    } catch (parseError) {
+                        LoggerUtil.warn('[RAG] Failed to parse response line', {
+                            line: line.substring(0, 100)
                         });
+                    }
+                }
 
-                        resolve({
-                            documentId: completeData.document_id,
-                            chunkCount: completeData.chunks,
-                            textLength: completeData.text_length || 0,
-                            fileType: completeData.file_type || 'unknown',
-                            status: 'complete'
-                        });
-                    });
+                // If we got an error, throw it
+                if (lastError && !completeData) {
+                    throw new Error(lastError);
+                }
 
-                    response.data.on('error', (error: Error) => {
-                        reject(new Error(`Stream error: ${error.message}`));
-                    });
+                // Validate response structure
+                if (!completeData || typeof completeData !== 'object') {
+                    throw new Error('RAG response is not a valid object');
+                }
+
+                if (!completeData.document_id) {
+                    throw new Error(`RAG response missing document_id - final status was: ${completeData.status}`);
+                }
+
+                if (completeData.status === 'error') {
+                    throw new Error(completeData.message || 'RAG upload failed');
+                }
+
+                // Validate chunk count
+                if (completeData.chunks === undefined || completeData.chunks === null) {
+                    throw new Error('RAG response missing chunk count');
+                }
+
+                if (typeof completeData.chunks !== 'number' || completeData.chunks < 0) {
+                    throw new Error(`RAG response has invalid chunk count: ${completeData.chunks}`);
+                }
+
+                LoggerUtil.info('[RAG] Upload successful', {
+                    fileName,
+                    documentId: completeData.document_id,
+                    chunks: completeData.chunks,
+                    textLength: completeData.text_length,
+                    fileType: completeData.file_type
                 });
+
+                return {
+                    documentId: completeData.document_id,
+                    chunkCount: completeData.chunks,
+                    textLength: completeData.text_length || 0,
+                    fileType: completeData.file_type || 'unknown',
+                    status: 'complete'
+                };
             } catch (error) {
                 LoggerUtil.warn(`[RAG] Upload failed (attempt ${attempt}/${this.config.retryAttempts})`, {
                     fileName,

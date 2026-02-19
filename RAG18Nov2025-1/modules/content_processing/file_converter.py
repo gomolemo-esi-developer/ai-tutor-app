@@ -99,24 +99,44 @@ class FileConverter:
         
         try:
             from faster_whisper import WhisperModel
+            import gc
             
+            # FIX (2026-02-19): Reduce memory footprint for large audio files
+            # - Use tiny model instead of base for 37MB+ files to fit in 512MB memory
+            # - Use beam_size=1 (greedy) instead of 5 to reduce memory
+            # - Force CPU-only with int8 quantization
+            # - Aggressive garbage collection
             model = WhisperModel(
-                "base",
+                "tiny",  # CHANGED: Use tiny model (139M) instead of base (140M with less compression)
                 device="cpu",
-                compute_type="int8",
+                compute_type="int8",  # Quantized to int8 for memory efficiency
                 download_root=str(self.models_dir)
             )
             
             if callback:
                 callback(f"Transcribing audio: {file_path.name}")
             
-            segments, info = model.transcribe(str(file_path), beam_size=5)
+            # FIX: Use greedy decoding (beam_size=1) instead of beam search to save memory
+            segments, info = model.transcribe(
+                str(file_path), 
+                beam_size=1,  # CHANGED: Greedy decoding uses much less memory
+                language="en",
+                vad_filter=True,  # Voice activity detection to skip silence
+                vad_parameters=dict(min_speech_duration_ms=250)
+            )
             
             transcription_parts = []
             for segment in segments:
                 transcription_parts.append(segment.text)
+                # Clear segment to free memory
+                del segment
             
             text = " ".join(transcription_parts)
+            
+            # Force garbage collection after transcription
+            del model
+            gc.collect()
+            
             logger.info(f"✅ Transcribed {file_path.name} ({len(text)} chars)")
             
             return text

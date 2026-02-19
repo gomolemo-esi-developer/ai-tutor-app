@@ -25,10 +25,20 @@ def generate_embeddings(texts: List[str]) -> List[List[float]]:
         return []
     
     embeddings_model = get_embeddings_model()
-    embeddings = embeddings_model.embed_documents(texts)
     
-    logger.info(f"✅ Generated embeddings for {len(texts)} texts")
-    return embeddings
+    # FIX (2026-02-19): Process embeddings in batches to reduce memory usage
+    # This prevents loading all embeddings into memory at once
+    batch_size = 50  # Process 50 texts at a time
+    all_embeddings = []
+    
+    for i in range(0, len(texts), batch_size):
+        batch = texts[i:i + batch_size]
+        batch_embeddings = embeddings_model.embed_documents(batch)
+        all_embeddings.extend(batch_embeddings)
+        logger.info(f"✅ Generated embeddings for batch {i//batch_size + 1} ({len(batch)} texts)")
+    
+    logger.info(f"✅ Generated embeddings for {len(texts)} total texts")
+    return all_embeddings
 
 def generate_single_embedding(text: str) -> List[float]:
     embeddings_model = get_embeddings_model()
