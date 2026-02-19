@@ -117,18 +117,36 @@ export class RAGService {
           headers: { 'Content-Type': 'multipart/form-data' }
         });
 
-        // Parse ndjson response (last line is completion)
+        // Parse ndjson response (each line is a status update)
+        // The stream includes: uploading, detecting, converting, conversion_complete, embedding, complete
         const lines = response.data.split('\n').filter((l: string) => l.trim());
         if (lines.length === 0) {
           throw new Error('RAG response is empty');
         }
 
-        const lastLine = lines[lines.length - 1];
-        let completeData: any;
-        try {
-          completeData = JSON.parse(lastLine);
-        } catch (parseError) {
-          throw new Error(`Failed to parse RAG response: ${lastLine}`);
+        // Find the final status message (should be "complete")
+        let completeData: any = null;
+        for (const line of lines) {
+          try {
+            const parsed = JSON.parse(line);
+            if (parsed.status === 'error') {
+              throw new Error(parsed.message || 'RAG upload failed');
+            }
+            // Keep updating with each status, but we need the final "complete" status
+            if (parsed.status === 'complete') {
+              completeData = parsed;
+              break;
+            }
+            // If we see intermediate statuses, keep the last one in case "complete" doesn't come
+            if (parsed.document_id) {
+              completeData = parsed;
+            }
+          } catch (parseError) {
+            // Ignore unparseable lines
+            if (line.trim()) {
+              LoggerUtil.warn('[RAG] Failed to parse response line', { line: line.substring(0, 100) });
+            }
+          }
         }
 
         // Validate response structure
@@ -136,19 +154,16 @@ export class RAGService {
           throw new Error('RAG response is not a valid object');
         }
 
+        // Accept "complete" or any status with document_id (in case final status isn't "complete")
+        if (!completeData.document_id) {
+          throw new Error(`RAG response missing document_id - final status was: ${completeData.status}`);
+        }
+        
         if (completeData.status === 'error') {
           throw new Error(completeData.message || 'RAG upload failed');
         }
 
-        if (completeData.status !== 'complete') {
-          throw new Error(`RAG response has invalid status: ${completeData.status}`);
-        }
-
-        // Validate critical fields exist
-        if (!completeData.document_id) {
-          throw new Error('RAG response missing document_id - file may not have been stored');
-        }
-
+        // Validate chunk count
         if (completeData.chunks === undefined || completeData.chunks === null) {
           throw new Error('RAG response missing chunk count');
         }
