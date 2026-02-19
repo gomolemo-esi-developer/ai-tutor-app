@@ -3,6 +3,7 @@ from typing import Optional, Callable, Dict
 import sys
 import tempfile
 import os
+import subprocess
 
 sys.path.append(str(Path(__file__).parent.parent.parent))
 from modules.shared.logger import setup_logger
@@ -286,16 +287,19 @@ class FileConverter:
                         cmd = [
                             'libreoffice',
                             '--headless',
+                            '--norestore',
+                            '--invisible',
+                            '--nofirststartwizard',
                             '--convert-to', 'pptx',
                             '--outdir', str(tmpdir),
                             str(file_path)
                         ]
                         
-                        result = subprocess.run(cmd, capture_output=True, timeout=60)
+                        result = subprocess.run(cmd, capture_output=True, text=True, timeout=60)
                         
                         if result.returncode != 0:
-                            # LibreOffice conversion failed, try fallback method
-                            logger.warning(f"LibreOffice conversion failed, using fallback...")
+                            # LibreOffice conversion failed, log details
+                            logger.warning(f"LibreOffice conversion failed: {result.stderr}, using fallback...")
                             return self._extract_ppt_fallback(file_path, callback)
                         
                         if not converted_path.exists():
@@ -339,36 +343,9 @@ class FileConverter:
             raise ImportError("python-pptx required. Install: pip install python-pptx")
     
     def _extract_ppt_fallback(self, file_path: Path, callback: Optional[Callable] = None) -> str:
-        """Fallback method to extract text from .ppt files using alternative method"""
-        if callback:
-            callback("Using fallback extraction for .ppt file...")
-        
-        try:
-            # Try using python-pptx on the original file (sometimes works)
-            from pptx import Presentation
-            presentation = Presentation(str(file_path))
-            
-            total_slides = len(presentation.slides)
-            extracted_slides = []
-            
-            for i, slide in enumerate(presentation.slides, 1):
-                slide_text_parts = []
-                for shape in slide.shapes:
-                    if hasattr(shape, "text") and shape.text:
-                        slide_text_parts.append(shape.text)
-                
-                slide_text = "\n".join(slide_text_parts)
-                if slide_text.strip():
-                    extracted_slides.append(f"=== Slide {i} ===\n{slide_text}")
-            
-            text = "\n\n".join(extracted_slides)
-            logger.info(f"✅ Fallback: Extracted {total_slides} slides from {file_path.name}")
-            return text
-            
-        except Exception as e:
-            # If all else fails, return a generic message
-            logger.error(f"Could not extract text from .ppt file: {str(e)}")
-            return f"[Presentation file: {file_path.name}] - Could not extract text content. Please use .pptx format or provide PDF version."
+        """Fallback method for .ppt files - returns error message"""
+        logger.error(f"Cannot process .ppt file (legacy format). File: {file_path.name}")
+        return f"[Presentation file: {file_path.name}] - Cannot extract text from .ppt (legacy PowerPoint format). Please convert your file to .pptx format and upload again.\n\nHow to convert:\n1. Open the .ppt file in Microsoft PowerPoint or LibreOffice Impress\n2. Go to File > Save As\n3. Change the format to 'PowerPoint Presentation (.pptx)'\n4. Upload the new .pptx file"
     
     def _convert_docx(self, file_path: Path, callback: Optional[Callable] = None) -> str:
         """Extract text from Word documents"""
