@@ -1,0 +1,123 @@
+diff --git a/ai-tutor-app/backend/src/config/rag.config.ts b/ai-tutor-app/backend/src/config/rag.config.ts
+index bf2b889..7cfde4e 100644
+--- a/ai-tutor-app/backend/src/config/rag.config.ts
++++ b/ai-tutor-app/backend/src/config/rag.config.ts
+@@ -13,11 +13,11 @@ export class RAGConfig {
+ 
+   constructor(
+     baseUrl: string,
+-    timeout: number = 120000, // 2 minutes - allow time for audio transcription with Whisper
++    timeout: number = 900000, // 15 minutes - allow time for video transcription with Whisper
+     apiKey?: string,
+     enabled: boolean = true,
+     retryAttempts: number = 3,
+-    retryDelayMs: number = 1000
++    retryDelayMs: number = 2000
+   ) {
+     this.baseUrl = baseUrl;
+     this.timeout = timeout;
+@@ -45,11 +45,11 @@ export class RAGConfig {
+    */
+   static fromEnv(): RAGConfig {
+     const baseUrl = process.env.RAG_SERVICE_URL || '';
+-    const timeout = parseInt(process.env.RAG_TIMEOUT || '120000', 10); // 2 minutes default
++    const timeout = parseInt(process.env.RAG_TIMEOUT || '900000', 10); // 15 minutes default
+     const apiKey = process.env.RAG_API_KEY;
+     const enabled = process.env.RAG_ENABLE !== 'false';
+     const retryAttempts = parseInt(process.env.RAG_RETRY_ATTEMPTS || '3', 10);
+-    const retryDelayMs = parseInt(process.env.RAG_RETRY_DELAY_MS || '1000', 10);
++    const retryDelayMs = parseInt(process.env.RAG_RETRY_DELAY_MS || '2000', 10);
+ 
+     return new RAGConfig(
+       baseUrl,
+diff --git a/ai-tutor-app/backend/src/services/rag.service.ts b/ai-tutor-app/backend/src/services/rag.service.ts
+index 25b0a96..aad187f 100644
+--- a/ai-tutor-app/backend/src/services/rag.service.ts
++++ b/ai-tutor-app/backend/src/services/rag.service.ts
+@@ -113,14 +113,15 @@ export class RAGService {
+                     ? `/educator/upload?callback_url=${encodeURIComponent(callbackUrl)}`
+                     : '/educator/upload';
+ 
+-                // FIX (2026-02-19): Simplify response handling
+-                // Use axios default behavior which buffers the response
+-                // Then parse the NDJSON response as text
++                // FIX (2026-02-19): Improve response handling for large video files
++                // Use axios with extended timeout to allow video transcription
++                // The timeout is already set in the axios instance, but we can override per request
+                 const response = await this.client.post(uploadUrl, formData, {
+                     headers: { 'Content-Type': 'multipart/form-data' },
+-                    // Let axios handle response buffering/parsing
+-                    // Since we expect NDJSON, we need to handle it specially
+-                    validateStatus: () => true  // Don't throw on any status code
++                    // Override timeout for this specific request (use full 15 minutes)
++                    timeout: Math.max(this.config.timeout, 15 * 60 * 1000),
++                    // Don't throw on any status code - we'll handle errors in response parsing
++                    validateStatus: () => true
+                 });
+ 
+                 // Parse ndjson response - response.data should be a string containing newline-delimited JSON
+@@ -209,15 +210,24 @@ export class RAGService {
+                     status: 'complete'
+                 };
+             } catch (error) {
++                const errorMsg = error instanceof Error ? error.message : String(error);
+                 LoggerUtil.warn(`[RAG] Upload failed (attempt ${attempt}/${this.config.retryAttempts})`, {
+                     fileName,
+-                    error: error instanceof Error ? error.message : String(error)
++                    error: errorMsg,
++                    fileSize: file.length
+                 });
+ 
+                 if (attempt < this.config.retryAttempts) {
++                    // Exponential backoff with longer delays for stream errors
++                    // Stream abort typically means RAG service is still processing
+                     const delay = this.config.retryDelayMs * Math.pow(2, attempt - 1);
++                    LoggerUtil.info(`[RAG] Retrying in ${delay}ms`, { fileName });
+                     await new Promise(resolve => setTimeout(resolve, delay));
+                 } else {
++                    LoggerUtil.error(`[RAG] Upload failed after ${this.config.retryAttempts} attempts`, {
++                        fileName,
++                        lastError: errorMsg
++                    });
+                     throw error;
+                 }
+             }
+diff --git a/ai-tutor-app/tutorverse-hub-main/src/services/EducatorService.ts b/ai-tutor-app/tutorverse-hub-main/src/services/EducatorService.ts
+index b00f2f1..9db7348 100644
+--- a/ai-tutor-app/tutorverse-hub-main/src/services/EducatorService.ts
++++ b/ai-tutor-app/tutorverse-hub-main/src/services/EducatorService.ts
+@@ -328,10 +328,11 @@ export const EducatorService = {
+         author: data.metadata.author,
+         description: data.metadata.description,
+       };
+-      // Use extended timeout (10 minutes) for file processing
+-      // Audio/video transcription with Whisper can take time, with up to 3 retries
++      // Use extended timeout (15 minutes) for file processing
++      // Video transcription with Whisper can take 30-60 seconds per 10MB file
++      // Multiple retries can extend this to 15+ minutes for large files
+       return await apiClient.post('/api/educator/files', payload, {
+-        timeout: 10 * 60 * 1000, // 10 minutes (to allow for RAG retries)
++        timeout: 15 * 60 * 1000, // 15 minutes (to allow for RAG processing + 3 retries)
+       });
+     } catch (error) {
+       console.error('Failed to save file:', error);
+diff --git a/nginx.conf b/nginx.conf
+index 41caed3..df453e9 100644
+--- a/nginx.conf
++++ b/nginx.conf
+@@ -32,10 +32,11 @@ server {
+         proxy_ssl_verify_depth 0;
+         proxy_ssl_session_reuse off;
+         
+-        # Increase timeout for large uploads
+-        proxy_connect_timeout 60s;
+-        proxy_send_timeout 300s;
+-        proxy_read_timeout 300s;
++        # Increase timeout for large uploads and video transcription
++        # Video transcription can take 30-60 seconds per 10MB file
++        proxy_connect_timeout 120s;
++        proxy_send_timeout 900s;
++        proxy_read_timeout 900s;
+     }
+ 
+     # Fallback to index.html for SPA routing
