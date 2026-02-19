@@ -38,8 +38,9 @@ services:
       - ENVIRONMENT=production
       - RAG_SERVICE_URL=http://rag-service:8000
       - RAG_ENABLE=true
-      - RAG_TIMEOUT=30000
+      - RAG_TIMEOUT=180000
       - RAG_RETRY_ATTEMPTS=3
+      - RAG_RETRY_DELAY_MS=2000
     env_file:
       - ./ai-tutor-app/backend/.env
     depends_on:
@@ -48,6 +49,8 @@ services:
     networks:
       - tutorverse
     restart: unless-stopped
+    mem_limit: 512m
+    memswap_limit: 512m
     logging:
       driver: "json-file"
       options:
@@ -73,6 +76,8 @@ services:
     networks:
       - tutorverse
     restart: unless-stopped
+    mem_limit: 2g
+    memswap_limit: 2g
     logging:
       driver: "json-file"
       options:
