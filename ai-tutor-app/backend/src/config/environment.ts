@@ -80,7 +80,7 @@ export class EnvConfig {
 
       JWT_SECRET: process.env.JWT_SECRET || 'dev-secret-key',
 
-      AI_API_PROVIDER: (process.env.AI_API_PROVIDER || 'claude') as 'claude' | 'openai',
+      AI_API_PROVIDER: (process.env.AI_API_PROVIDER || 'openai') as 'claude' | 'openai',
       AI_API_KEY: process.env.AI_API_KEY || '',
 
       CORS_ORIGIN: process.env.CORS_ORIGIN || '*',

@@ -99,8 +99,17 @@ export class AIService {
    * Returns stub response if API key is not configured (graceful degradation)
    */
   private static async callAI(prompt: string): Promise<string> {
-    // Stub response - no AI integration needed
-    return '[Stub AI Response - AI integration not configured]';
+    if (!this.apiKey) {
+      return '[Stub AI Response - API key not configured]';
+    }
+
+    if (this.apiProvider === 'claude') {
+      return this.callClaude(prompt);
+    } else if (this.apiProvider === 'openai') {
+      return this.callOpenAI(prompt);
+    } else {
+      throw new BadRequestError(`Unknown AI provider: ${this.apiProvider}`);
+    }
   }
 
   /**
