@@ -59,7 +59,7 @@ services:
        - key: RAG_ENABLE
          value: 'true'
        - key: RAG_TIMEOUT
-         value: '30000'
+         value: '180000'
        - key: RAG_RETRY_ATTEMPTS
          value: '3'
 
