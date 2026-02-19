@@ -34,10 +34,13 @@ RUN mkdir -p /app/data \
     /app/conversion/models
 
 # Create non-root user for security
-RUN groupadd -r python && useradd -r -g python python
+RUN groupadd -r python && useradd -r -g python -d /home/python -m python
 
 # Create temp directory for the python user
 RUN mkdir -p /app/temp && chown -R python:python /app/temp
+
+# Create LibreOffice config directory for the python user
+RUN mkdir -p /home/python/.config && chown -R python:python /home/python
 
 # Fix permissions so python user can write to all directories
 RUN chown -R python:python /app/data \
@@ -62,7 +65,10 @@ ENV TMPDIR=/app/temp \
     TMP=/app/temp \
     HF_HOME=/app/temp/hf_cache \
     TORCH_HOME=/app/temp/torch_cache \
-    TRANSFORMERS_CACHE=/app/temp/transformers_cache
+    TRANSFORMERS_CACHE=/app/temp/transformers_cache \
+    HOME=/home/python \
+    SAL_NO_STARTUP_WIZARD=1 \
+    SAL_USE_VCLPLUGIN=gtk3
 
 # Set environment variables
 ENV PYTHONUNBUFFERED=1 \
