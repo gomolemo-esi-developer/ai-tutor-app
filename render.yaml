@@ -4,6 +4,7 @@ services:
     name: tutorverse-rag
     runtime: docker
     region: oregon
+    plan: standard
     dockerfilePath: ./Dockerfile.rag
     autoDeploy: true
     healthCheckPath: /health
