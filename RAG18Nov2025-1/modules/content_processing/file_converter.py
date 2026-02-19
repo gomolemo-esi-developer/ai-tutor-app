@@ -343,19 +343,55 @@ class FileConverter:
             raise ImportError("python-pptx required. Install: pip install python-pptx")
     
     def _extract_ppt_fallback(self, file_path: Path, callback: Optional[Callable] = None) -> str:
-        """Fallback method for .ppt files - returns error message"""
-        logger.error(f"Cannot process .ppt file (legacy format). File: {file_path.name}")
-        return f"[Presentation file: {file_path.name}] - Cannot extract text from .ppt (legacy PowerPoint format). Please convert your file to .pptx format and upload again.\n\nHow to convert:\n1. Open the .ppt file in Microsoft PowerPoint or LibreOffice Impress\n2. Go to File > Save As\n3. Change the format to 'PowerPoint Presentation (.pptx)'\n4. Upload the new .pptx file"
+        """Fallback method to extract text from .ppt files - returns error message if unable to convert"""
+        logger.error(f"Could not extract text from .ppt file: {file_path.name}")
+        return f"[Presentation file: {file_path.name}] - Could not extract text content. Please use .pptx format or provide PDF version."
     
     def _convert_docx(self, file_path: Path, callback: Optional[Callable] = None) -> str:
-        """Extract text from Word documents"""
+        """Extract text from Word documents (.docx and .doc)"""
         if callback:
             callback(f"Extracting text from Word document...")
+        
+        # Handle .doc (legacy format) conversion to .docx first
+        file_to_process = file_path
+        if file_path.suffix.lower() == '.doc':
+            if callback:
+                callback("Converting .doc to .docx format...")
+            
+            try:
+                with tempfile.TemporaryDirectory() as tmpdir:
+                    converted_path = Path(tmpdir) / f"{file_path.stem}.docx"
+                    
+                    cmd = [
+                        'libreoffice',
+                        '--headless',
+                        '--norestore',
+                        '--invisible',
+                        '--nofirststartwizard',
+                        '--convert-to', 'docx',
+                        '--outdir', str(tmpdir),
+                        str(file_path)
+                    ]
+                    
+                    result = subprocess.run(cmd, capture_output=True, text=True, timeout=60)
+                    
+                    if result.returncode != 0:
+                        logger.warning(f"LibreOffice conversion failed: {result.stderr}, using fallback...")
+                        return f"[Document file: {file_path.name}] - Could not convert .doc file. Please use .docx format instead."
+                    
+                    if not converted_path.exists():
+                        logger.warning(f"Conversion succeeded but file not found at {converted_path}")
+                        return f"[Document file: {file_path.name}] - Could not convert .doc file. Please use .docx format instead."
+                    
+                    file_to_process = converted_path
+            except Exception as e:
+                logger.warning(f"LibreOffice conversion failed: {str(e)}, using fallback...")
+                return f"[Document file: {file_path.name}] - Could not convert .doc file. Please use .docx format instead."
         
         try:
             from docx import Document
             
-            doc = Document(str(file_path))
+            doc = Document(str(file_to_process))
             total_paragraphs = len(doc.paragraphs)
             
             extracted_text = []
@@ -387,14 +423,50 @@ class FileConverter:
             raise ImportError("python-docx required. Install: pip install python-docx")
     
     def _convert_excel(self, file_path: Path, callback: Optional[Callable] = None) -> str:
-        """Extract text from Excel files"""
+        """Extract text from Excel files (.xlsx and .xls)"""
         if callback:
             callback(f"Extracting data from Excel file...")
+        
+        # Handle .xls (legacy format) conversion to .xlsx first
+        file_to_process = file_path
+        if file_path.suffix.lower() == '.xls':
+            if callback:
+                callback("Converting .xls to .xlsx format...")
+            
+            try:
+                with tempfile.TemporaryDirectory() as tmpdir:
+                    converted_path = Path(tmpdir) / f"{file_path.stem}.xlsx"
+                    
+                    cmd = [
+                        'libreoffice',
+                        '--headless',
+                        '--norestore',
+                        '--invisible',
+                        '--nofirststartwizard',
+                        '--convert-to', 'xlsx',
+                        '--outdir', str(tmpdir),
+                        str(file_path)
+                    ]
+                    
+                    result = subprocess.run(cmd, capture_output=True, text=True, timeout=60)
+                    
+                    if result.returncode != 0:
+                        logger.warning(f"LibreOffice conversion failed: {result.stderr}, using fallback...")
+                        return f"[Excel file: {file_path.name}] - Could not convert .xls file. Please use .xlsx format instead."
+                    
+                    if not converted_path.exists():
+                        logger.warning(f"Conversion succeeded but file not found at {converted_path}")
+                        return f"[Excel file: {file_path.name}] - Could not convert .xls file. Please use .xlsx format instead."
+                    
+                    file_to_process = converted_path
+            except Exception as e:
+                logger.warning(f"LibreOffice conversion failed: {str(e)}, using fallback...")
+                return f"[Excel file: {file_path.name}] - Could not convert .xls file. Please use .xlsx format instead."
         
         try:
             import openpyxl
             
-            workbook = openpyxl.load_workbook(str(file_path))
+            workbook = openpyxl.load_workbook(str(file_to_process))
             extracted_text = []
             
             for sheet_idx, sheet_name in enumerate(workbook.sheetnames, 1):
