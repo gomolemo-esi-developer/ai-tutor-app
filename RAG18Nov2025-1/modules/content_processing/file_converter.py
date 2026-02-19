@@ -268,7 +268,51 @@ class FileConverter:
         try:
             from pptx import Presentation
             
-            presentation = Presentation(str(file_path))
+            # FIX (2026-02-19): Handle both .pptx and .ppt files
+            # python-pptx only works with .pptx format
+            # For .ppt files (old format), try converting to .pptx first using LibreOffice
+            if file_path.suffix.lower() == '.ppt':
+                if callback:
+                    callback("Converting .ppt to .pptx format...")
+                
+                try:
+                    import subprocess
+                    import tempfile
+                    
+                    # Use LibreOffice to convert .ppt to .pptx
+                    with tempfile.TemporaryDirectory() as tmpdir:
+                        converted_path = Path(tmpdir) / f"{file_path.stem}.pptx"
+                        
+                        cmd = [
+                            'libreoffice',
+                            '--headless',
+                            '--convert-to', 'pptx',
+                            '--outdir', str(tmpdir),
+                            str(file_path)
+                        ]
+                        
+                        result = subprocess.run(cmd, capture_output=True, timeout=60)
+                        
+                        if result.returncode != 0:
+                            # LibreOffice conversion failed, try fallback method
+                            logger.warning(f"LibreOffice conversion failed, using fallback...")
+                            return self._extract_ppt_fallback(file_path, callback)
+                        
+                        if not converted_path.exists():
+                            logger.warning(f"Conversion succeeded but file not found at {converted_path}")
+                            return self._extract_ppt_fallback(file_path, callback)
+                        
+                        # Process converted .pptx
+                        presentation = Presentation(str(converted_path))
+                        file_to_process = converted_path
+                except Exception as e:
+                    logger.warning(f"LibreOffice conversion failed: {str(e)}, using fallback...")
+                    return self._extract_ppt_fallback(file_path, callback)
+            else:
+                # For .pptx files, open directly
+                presentation = Presentation(str(file_path))
+                file_to_process = file_path
+            
             total_slides = len(presentation.slides)
             
             extracted_slides = []
@@ -293,6 +337,38 @@ class FileConverter:
         except ImportError:
             logger.error("python-pptx not installed")
             raise ImportError("python-pptx required. Install: pip install python-pptx")
+    
+    def _extract_ppt_fallback(self, file_path: Path, callback: Optional[Callable] = None) -> str:
+        """Fallback method to extract text from .ppt files using alternative method"""
+        if callback:
+            callback("Using fallback extraction for .ppt file...")
+        
+        try:
+            # Try using python-pptx on the original file (sometimes works)
+            from pptx import Presentation
+            presentation = Presentation(str(file_path))
+            
+            total_slides = len(presentation.slides)
+            extracted_slides = []
+            
+            for i, slide in enumerate(presentation.slides, 1):
+                slide_text_parts = []
+                for shape in slide.shapes:
+                    if hasattr(shape, "text") and shape.text:
+                        slide_text_parts.append(shape.text)
+                
+                slide_text = "\n".join(slide_text_parts)
+                if slide_text.strip():
+                    extracted_slides.append(f"=== Slide {i} ===\n{slide_text}")
+            
+            text = "\n\n".join(extracted_slides)
+            logger.info(f"✅ Fallback: Extracted {total_slides} slides from {file_path.name}")
+            return text
+            
+        except Exception as e:
+            # If all else fails, return a generic message
+            logger.error(f"Could not extract text from .ppt file: {str(e)}")
+            return f"[Presentation file: {file_path.name}] - Could not extract text content. Please use .pptx format or provide PDF version."
     
     def _convert_docx(self, file_path: Path, callback: Optional[Callable] = None) -> str:
         """Extract text from Word documents"""
