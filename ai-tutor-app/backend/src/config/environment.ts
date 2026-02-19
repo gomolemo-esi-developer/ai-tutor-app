@@ -96,9 +96,10 @@ export class EnvConfig {
       RAG_SERVICE_URL: process.env.RAG_SERVICE_URL,
       RAG_API_KEY: process.env.RAG_API_KEY,
       RAG_ENABLE: process.env.RAG_ENABLE || 'false',
-      RAG_TIMEOUT: process.env.RAG_TIMEOUT || '30000',
+      // Timeout increased to 10 minutes (600000ms) for large audio/video files that need transcription
+      RAG_TIMEOUT: process.env.RAG_TIMEOUT || '600000',
       RAG_RETRY_ATTEMPTS: process.env.RAG_RETRY_ATTEMPTS || '3',
-      RAG_RETRY_DELAY_MS: process.env.RAG_RETRY_DELAY_MS || '1000',
+      RAG_RETRY_DELAY_MS: process.env.RAG_RETRY_DELAY_MS || '2000',
     };
 
     this.validateRequired();
