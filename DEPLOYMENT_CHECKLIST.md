@@ -8,6 +8,10 @@
   - Changed beam search: `beam_size=5` → `beam_size=1` (5x less memory)
   - Added VAD filter to skip silence
   - Added garbage collection after transcription
+  - **NEW (2026-02-19)**: Added support for `.ppt` (old PowerPoint) files
+    - Converts `.ppt` to `.pptx` using LibreOffice
+    - Fallback extraction method if conversion fails
+    - Graceful error handling
 
 - ✅ **RAG18Nov2025-1/modules/content_processing/embeddings_generator.py**
   - Added batch processing (batch_size=50) for embeddings
