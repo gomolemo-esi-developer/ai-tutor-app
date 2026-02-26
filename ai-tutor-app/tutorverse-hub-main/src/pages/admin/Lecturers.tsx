@@ -317,6 +317,7 @@ const Lecturers: React.FC = () => {
             department: item.departmentId || item.department,
             moduleCode: item.moduleCode,
             moduleName: item.moduleName,
+            moduleIds: Array.isArray(moduleIds) ? moduleIds : [],
             campus: item.campusId || item.campus,
         });
         setIsModalOpen(true);
