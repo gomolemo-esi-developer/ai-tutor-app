@@ -57,24 +57,19 @@ const FacultyPage: React.FC = () => {
 
     const columns = [
         {
-            key: "id",
-            label: "Faculty ID",
-            render: (item: Faculty) => (
-                <span className="font-medium text-foreground">{item.id}</span>
-            ),
-        },
-        {
             key: "name",
             label: "Faculty Name",
             render: (item: Faculty) => (
-                <span className="font-medium text-foreground">{item.name}</span>
+                <span className="font-medium text-foreground max-w-[250px] truncate inline-block whitespace-nowrap" title={item.name}>
+                    {item.name}
+                </span>
             ),
         },
         {
             key: "abbreviation",
             label: "Code/Abbreviation",
             render: (item: Faculty) => (
-                <span className="text-xs font-medium text-primary bg-primary/10 px-2 py-1 rounded">
+                <span className="text-xs font-medium text-primary bg-primary/10 px-2 py-1 rounded max-w-[80px] truncate inline-block" title={item.abbreviation || 'N/A'}>
                     {item.abbreviation || 'N/A'}
                 </span>
             ),

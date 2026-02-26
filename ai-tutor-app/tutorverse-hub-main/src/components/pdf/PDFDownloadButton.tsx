@@ -2,7 +2,7 @@ import React, { useState } from 'react';
 import { Download, Loader2 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { toast } from 'sonner';
-import { exportElementToPDF, getTimestampForFilename } from '@/utils/pdf-export';
+import { exportElementToPDFGotenberg, getTimestampForFilename } from '@/utils/pdf-export-gotenberg';
 
 interface PDFDownloadButtonProps {
   elementId: string;
@@ -29,11 +29,9 @@ export const PDFDownloadButton: React.FC<PDFDownloadButtonProps> = ({
   const handleDownload = async () => {
     try {
       setIsLoading(true);
-      await exportElementToPDF(elementId, {
+      await exportElementToPDFGotenberg(elementId, {
         filename,
         title,
-        scale: 2,
-        margin: 12,
       });
       toast.success('PDF downloaded successfully!');
     } catch (error) {

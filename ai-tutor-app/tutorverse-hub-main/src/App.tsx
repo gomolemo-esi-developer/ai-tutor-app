@@ -34,6 +34,7 @@ import Departments from "./pages/admin/Departments";
 import Courses from "./pages/admin/Courses";
 import ModuleList from "./pages/admin/ModuleList";
 import Campus from "./pages/admin/Campus";
+import RAGSettings from "./pages/admin/RAGSettings";
 import NotFound from "./pages/common/NotFound";
 
 const queryClient = new QueryClient();
@@ -169,6 +170,11 @@ const AppRoutes = () => {
       <Route path="/admin/campus" element={
         <ProtectedRoute roles={['admin']}>
           <Campus />
+        </ProtectedRoute>
+      } />
+      <Route path="/admin/rag-settings" element={
+        <ProtectedRoute roles={['admin']}>
+          <RAGSettings />
         </ProtectedRoute>
       } />
 

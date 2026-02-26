@@ -59,6 +59,22 @@ CONVERSION_ENGINES = {
     "ocr": "easyocr"
 }
 
+def persist_setting(key: str, value) -> bool:
+    """
+    Save a setting to persistent storage (.env file)
+    This ensures settings survive service restarts
+    """
+    try:
+        from dotenv import set_key
+        env_path = Path(__file__).parent / ".env"
+        set_key(str(env_path), key.upper(), str(value))
+        print(f"[Config] Persisted {key.upper()} = {value}")
+        return True
+    except Exception as e:
+        print(f"[Config] Error persisting {key}: {e}")
+        return False
+
+
 def validate_config():
     if not OPENAI_API_KEY:
         raise ValueError("OPENAI_API_KEY not found in environment")

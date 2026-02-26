@@ -83,17 +83,10 @@ const AdminFiles: React.FC = () => {
 
   const columns = [
     {
-      key: "id",
-      label: "File ID",
-      render: (item: FileData) => (
-        <span className="font-medium text-foreground text-xs">{item.id}</span>
-      ),
-    },
-    {
       key: "name",
       label: "File Name",
       render: (item: FileData) => (
-        <span className="font-medium text-foreground max-w-xs truncate" title={item.name}>
+        <span className="font-medium text-foreground max-w-[250px] truncate inline-block whitespace-nowrap" title={item.name}>
           {item.name}
         </span>
       ),
@@ -102,7 +95,7 @@ const AdminFiles: React.FC = () => {
       key: "moduleCode",
       label: "Modules",
       render: (item: FileData) => (
-        <span className="text-xs font-medium text-primary bg-primary/10 px-2 py-1 rounded max-w-xs truncate" title={item.moduleCode || 'N/A'}>
+        <span className="text-xs font-medium text-primary bg-primary/10 px-2 py-1 rounded max-w-[80px] truncate inline-block" title={item.moduleCode || 'N/A'}>
           {item.moduleCode || 'N/A'}
         </span>
       ),
@@ -111,7 +104,7 @@ const AdminFiles: React.FC = () => {
       key: "authorName",
       label: "Author",
       render: (item: FileData) => (
-        <span className="text-sm text-foreground max-w-xs truncate" title={item.authorName || 'N/A'}>
+        <span className="text-sm text-foreground max-w-[250px] truncate inline-block whitespace-nowrap" title={item.authorName || 'N/A'}>
           {item.authorName || 'N/A'}
         </span>
       ),
@@ -120,7 +113,7 @@ const AdminFiles: React.FC = () => {
       key: "description",
       label: "Description",
       render: (item: FileData) => (
-        <span className="text-sm text-foreground max-w-sm truncate" title={item.description || 'N/A'}>
+        <span className="text-sm text-foreground max-w-[250px] truncate inline-block whitespace-nowrap" title={item.description || 'N/A'}>
           {item.description || 'N/A'}
         </span>
       ),
@@ -129,7 +122,7 @@ const AdminFiles: React.FC = () => {
       key: "contentType",
       label: "Content Type",
       render: (item: FileData) => (
-        <span className="text-xs font-medium text-slate-700 bg-slate-200 px-2 py-1 rounded">
+        <span className="px-2 py-1 bg-secondary text-secondary-foreground text-xs rounded max-w-[100px] truncate inline-block">
           {item.contentType || 'N/A'}
         </span>
       ),
@@ -138,7 +131,7 @@ const AdminFiles: React.FC = () => {
       key: "fileType",
       label: "File Type",
       render: (item: FileData) => (
-        <span className="text-xs font-medium text-accent bg-accent/10 px-2 py-1 rounded capitalize">
+        <span className="text-xs font-medium text-accent bg-accent/10 px-2 py-1 rounded capitalize max-w-[80px] truncate inline-block">
           {item.fileType || item.type || 'Unknown'}
         </span>
       ),
@@ -147,7 +140,7 @@ const AdminFiles: React.FC = () => {
       key: "createdAt",
       label: "Date of Creation",
       render: (item: FileData) => (
-        <span className="text-sm text-muted-foreground">
+        <span className="text-sm text-muted-foreground max-w-[100px] truncate inline-block">
           {item.createdAt ? new Date(item.createdAt).toLocaleDateString() : 'N/A'}
         </span>
       ),
@@ -156,7 +149,7 @@ const AdminFiles: React.FC = () => {
       key: "updatedAt",
       label: "Date of Update",
       render: (item: FileData) => (
-        <span className="text-sm text-muted-foreground">
+        <span className="text-sm text-muted-foreground max-w-[100px] truncate inline-block">
           {item.updatedAt ? new Date(item.updatedAt).toLocaleDateString() : 'N/A'}
         </span>
       ),

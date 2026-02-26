@@ -114,31 +114,30 @@ const ModuleListPage: React.FC = () => {
 
   const columns = [
     {
-      key: 'id',
-      label: 'Module ID',
-      render: (item: AdminModule) => (
-        <span className="text-sm font-normal text-primary bg-primary/10 px-2 py-1 rounded">{item.id}</span>
-      ),
-    },
-    {
       key: 'name',
       label: 'Module Name',
       render: (item: AdminModule) => (
-        <span className="text-sm font-normal text-foreground">{item.name}</span>
+        <span className="text-sm font-normal text-foreground max-w-[250px] truncate inline-block whitespace-nowrap" title={item.name}>
+          {item.name}
+        </span>
       ),
     },
     {
       key: 'description',
       label: 'Description',
       render: (item: AdminModule) => (
-        <span className="text-sm font-normal text-foreground">{item.description || 'N/A'}</span>
+        <span className="text-sm font-normal text-foreground max-w-[250px] truncate inline-block whitespace-nowrap" title={item.description || 'N/A'}>
+          {item.description || 'N/A'}
+        </span>
       ),
     },
     {
       key: 'code',
       label: 'Module Code',
       render: (item: AdminModule) => (
-        <span className="text-sm font-normal text-foreground">{item.code || 'N/A'}</span>
+        <span className="text-xs font-medium text-primary bg-primary/10 px-2 py-1 rounded max-w-[110px] truncate inline-block" title={item.code || 'N/A'}>
+          {item.code || 'N/A'}
+        </span>
       ),
     },
     {
@@ -146,7 +145,7 @@ const ModuleListPage: React.FC = () => {
       label: 'Course Code',
       render: (item: AdminModule) => {
         const course = courses.find(c => c.id === item.courseId);
-        return <span className="text-sm font-normal text-foreground">{course?.code || item.courseId || 'N/A'}</span>;
+        return <span className="px-2 py-1 bg-secondary text-secondary-foreground text-xs rounded max-w-[110px] truncate inline-block" title={course?.code || item.courseId || 'N/A'}>{course?.code || item.courseId || 'N/A'}</span>;
       },
     },
   ];

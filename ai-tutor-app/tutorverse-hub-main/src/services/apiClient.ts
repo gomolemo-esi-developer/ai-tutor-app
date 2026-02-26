@@ -148,20 +148,30 @@ class ApiClient {
       }
 
       // Parse successful response
-      const result: ApiResponse<T> = await response.json();
+      const result: any = await response.json();
 
-      if (!result.success) {
-        const error: ApiError = new Error(result.error || 'Unknown error');
-        error.code = result.code;
-        error.details = result.details;
-        throw error;
+      // Handle wrapped API responses (success: true/false)
+      if (typeof result.success === 'boolean') {
+        if (!result.success) {
+          const error: ApiError = new Error(result.error || 'Unknown error');
+          error.code = result.code;
+          error.details = result.details;
+          throw error;
+        }
+
+        if (this.debug) {
+          console.log(`✅ ${method} ${endpoint}:`, result.data);
+        }
+
+        return result.data as T;
       }
 
+      // Handle raw JSON responses (RAG service)
       if (this.debug) {
-        console.log(`✅ ${method} ${endpoint}:`, result.data);
+        console.log(`✅ ${method} ${endpoint}:`, result);
       }
 
-      return result.data as T;
+      return result as T;
     } catch (error: any) {
       if (this.debug) {
         console.error(`🔥 ${method} ${endpoint}:`, error.message);

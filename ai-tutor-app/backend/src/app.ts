@@ -109,6 +109,9 @@ import {
   handleDeleteProfilePicture,
 } from './lambda/user/profile-picture';
 
+// RAG Settings routes
+import ragSettingsRouter from './routes/rag-settings';
+
 // Initialize environment config
 EnvConfig.getConfig();
 
@@ -639,6 +642,11 @@ app.delete(
   authMiddleware,
   adaptLambdaHandler(handleDeleteProfilePicture)
 );
+
+/**
+ * RAG Settings routes
+ */
+app.use('/api', ragSettingsRouter);
 
 /**
  * 404 Not Found handler

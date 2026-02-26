@@ -108,26 +108,21 @@ const CoursesPage: React.FC = () => {
 
   const columns = [
     {
-      key: "id",
-      label: "Course ID",
-      render: (item: Course) => (
-        <span className="text-sm font-normal text-primary bg-primary/10 px-2 py-1 rounded">
-          {item.id || item.courseId || "N/A"}
-        </span>
-      ),
-    },
-    {
       key: "name",
       label: "Course Name",
       render: (item: Course) => (
-        <span className="text-sm font-normal text-foreground">{item.name}</span>
+        <span className="text-sm font-normal text-foreground max-w-[250px] truncate inline-block whitespace-nowrap" title={item.name}>
+          {item.name}
+        </span>
       ),
     },
     {
       key: "code",
       label: "Course Code",
       render: (item: Course) => (
-        <span className="text-sm font-normal text-foreground">{item.code || "N/A"}</span>
+        <span className="text-xs font-medium text-primary bg-primary/10 px-2 py-1 rounded max-w-[100px] truncate inline-block" title={item.code || "N/A"}>
+          {item.code || "N/A"}
+        </span>
       ),
     },
     {
@@ -135,7 +130,7 @@ const CoursesPage: React.FC = () => {
       label: "Department Name",
       render: (item: Course) => {
         const dept = departments.find(d => d.id === item.departmentId);
-        return <span className="text-sm font-normal text-foreground">{dept?.name || item.departmentId || "N/A"}</span>;
+        return <span className="text-sm font-normal text-foreground max-w-[150px] truncate inline-block" title={dept?.name || item.departmentId || "N/A"}>{dept?.name || item.departmentId || "N/A"}</span>;
       },
     },
     {
@@ -144,7 +139,7 @@ const CoursesPage: React.FC = () => {
       render: (item: Course) => {
         const dept = departments.find(d => d.id === item.departmentId);
         const faculty = faculties.find(f => f.id === dept?.facultyId);
-        return <span className="text-sm font-normal text-foreground">{faculty?.name || "N/A"}</span>;
+        return <span className="text-sm font-normal text-foreground max-w-[150px] truncate inline-block" title={faculty?.name || "N/A"}>{faculty?.name || "N/A"}</span>;
       },
     },
   ];

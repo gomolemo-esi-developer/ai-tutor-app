@@ -47,6 +47,7 @@ const LeftSidebar: React.FC = () => {
     { icon: BookOpen, label: 'Courses', path: '/admin/courses' },
     { icon: BookOpen, label: 'Module List', path: '/admin/modules' },
     { icon: MapPin, label: 'Campus', path: '/admin/campus' },
+    { icon: Sparkles, label: 'RAG Settings', path: '/admin/rag-settings' },
     { icon: Settings, label: 'Profile', path: '/profile' },
   ];
 

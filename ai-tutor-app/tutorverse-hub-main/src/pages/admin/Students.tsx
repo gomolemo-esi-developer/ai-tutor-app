@@ -196,7 +196,7 @@ const Students: React.FC = () => {
      key: "firstName",
      label: "Full Name",
      render: (item: Student) => (
-       <span className="text-sm font-normal text-foreground">
+       <span className="text-sm font-normal text-foreground whitespace-nowrap">
          {item.firstName || item.name} {item.lastName || item.surname}
        </span>
      ),
@@ -221,7 +221,7 @@ const Students: React.FC = () => {
      render: (item: Student) => {
        const courseId = (item as any).courseId;
        const course = courses?.find((c: any) => c.id === courseId);
-       return <span className="text-sm font-normal text-foreground">{course?.code || 'N/A'}</span>;
+       return <span className="text-xs font-medium text-primary bg-primary/10 px-2 py-1 rounded whitespace-nowrap">{course?.code || 'N/A'}</span>;
      },
    },
    {
@@ -233,11 +233,11 @@ const Students: React.FC = () => {
          return <span className="text-sm font-normal text-foreground">None</span>;
        }
        return (
-         <div className="flex flex-wrap gap-1">
+         <div className="flex flex-nowrap gap-1 overflow-x-auto">
            {moduleIds.map((moduleId: string) => {
              const module = modules.find(m => m.id === moduleId);
              return (
-               <span key={moduleId} className="px-2 py-1 bg-secondary text-secondary-foreground text-xs rounded">
+               <span key={moduleId} className="px-2 py-1 bg-secondary text-secondary-foreground text-xs rounded whitespace-nowrap flex-shrink-0">
                  {module?.code || moduleId}
                </span>
              );
@@ -251,7 +251,7 @@ const Students: React.FC = () => {
      label: "Department",
      render: (item: Student) => {
        const dept = departments.find(d => d.id === item.department);
-       return <span className="text-sm font-normal text-foreground">{dept?.name || item.department || 'N/A'}</span>;
+       return <span className="text-sm font-normal text-foreground whitespace-nowrap">{dept?.name || item.department || 'N/A'}</span>;
      },
    },
    {
@@ -263,7 +263,7 @@ const Students: React.FC = () => {
        if (!campus) {
          console.warn(`Campus not found for ID: ${campusId}, available campuses:`, campuses.map(c => ({ id: c.id, name: c.name })));
        }
-       return <span className="text-sm font-normal text-foreground">{campus?.name || campusId || 'N/A'}</span>;
+       return <span className="text-sm font-normal text-foreground whitespace-nowrap">{campus?.name || campusId || 'N/A'}</span>;
      },
    },
   ];

@@ -76,26 +76,21 @@ const DepartmentsPage: React.FC = () => {
 
   const columns = [
     {
-      key: "id",
-      label: "Department ID",
-      render: (item: Department) => (
-        <span className="text-sm font-normal text-primary bg-primary/10 px-2 py-1 rounded">
-          {item.id || "N/A"}
-        </span>
-      ),
-    },
-    {
       key: "name",
       label: "Department Name",
       render: (item: Department) => (
-        <span className="text-sm font-normal text-foreground">{item.name}</span>
+        <span className="text-sm font-normal text-foreground max-w-[250px] truncate inline-block whitespace-nowrap" title={item.name}>
+          {item.name}
+        </span>
       ),
     },
     {
       key: "code",
       label: "Department Code",
       render: (item: Department) => (
-        <span className="text-sm font-normal text-foreground">{item.code || "N/A"}</span>
+        <span className="text-xs font-medium text-primary bg-primary/10 px-2 py-1 rounded max-w-[100px] truncate inline-block" title={item.code || "N/A"}>
+          {item.code || "N/A"}
+        </span>
       ),
     },
     {
@@ -103,7 +98,7 @@ const DepartmentsPage: React.FC = () => {
       label: "Faculty Name",
       render: (item: Department) => {
         const faculty = faculties.find(f => f.id === item.facultyId);
-        return <span className="text-sm font-normal text-foreground">{faculty?.name || item.facultyId || "N/A"}</span>;
+        return <span className="text-sm font-normal text-foreground max-w-[150px] truncate inline-block" title={faculty?.name || item.facultyId || "N/A"}>{faculty?.name || item.facultyId || "N/A"}</span>;
       },
     },
   ];

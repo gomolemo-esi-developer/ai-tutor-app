@@ -5,7 +5,7 @@ import MainLayout from '@/components/layout/MainLayout';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import PDFDownloadButton from '@/components/pdf/PDFDownloadButton';
-import { getTimestampForFilename } from '@/utils/pdf-export';
+import { getTimestampForFilename } from '@/utils/pdf-export-gotenberg';
 
 interface QuizResult {
   id: string;

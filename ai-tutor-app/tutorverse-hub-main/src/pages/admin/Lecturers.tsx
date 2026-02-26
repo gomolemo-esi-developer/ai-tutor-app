@@ -166,7 +166,7 @@ const Lecturers: React.FC = () => {
             key: 'name',
             label: 'Full Name',
             render: (item: Lecturer) => (
-                <span className="font-medium text-foreground">
+                <span className="font-medium text-foreground whitespace-nowrap">
                     {item.firstName || item.name} {item.lastName || item.surname}
                 </span>
             ),
@@ -194,11 +194,11 @@ const Lecturers: React.FC = () => {
                     return <span className="text-sm text-muted-foreground">None</span>;
                 }
                 return (
-                    <div className="flex flex-wrap gap-1">
+                    <div className="flex flex-nowrap gap-1 overflow-x-auto">
                         {moduleIds.map((moduleId: string) => {
                             const module = modules.find(m => m.id === moduleId);
                             return (
-                                <span key={moduleId} className="px-2 py-1 bg-secondary text-secondary-foreground text-xs rounded">
+                                <span key={moduleId} className="px-2 py-1 bg-secondary text-secondary-foreground text-xs rounded whitespace-nowrap flex-shrink-0">
                                     {module?.code || moduleId}
                                 </span>
                             );
@@ -212,7 +212,7 @@ const Lecturers: React.FC = () => {
             label: 'Department',
             render: (item: Lecturer) => {
                 const dept = departments.find(d => d.id === item.departmentId);
-                return <span>{dept?.name || item.department || 'N/A'}</span>;
+                return <span className="whitespace-nowrap">{dept?.name || item.department || 'N/A'}</span>;
             },
         },
         {
@@ -220,7 +220,7 @@ const Lecturers: React.FC = () => {
             label: 'Campus',
             render: (item: Lecturer) => {
                 const campus = campuses.find(c => c.id === item.campusId);
-                return <span>{campus?.name || item.campus || 'N/A'}</span>;
+                return <span className="whitespace-nowrap">{campus?.name || item.campus || 'N/A'}</span>;
             },
         },
     ];

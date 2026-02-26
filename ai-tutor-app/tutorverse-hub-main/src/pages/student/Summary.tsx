@@ -13,7 +13,7 @@ import { ContentItem } from '@/types';
 import { useApi } from '@/hooks/useApi';
 import { toast } from 'sonner';
 import PDFDownloadButton from '@/components/pdf/PDFDownloadButton';
-import { getTimestampForFilename } from '@/utils/pdf-export';
+import { getTimestampForFilename } from '@/utils/pdf-export-gotenberg';
 
 interface SummaryData {
     overview: string;

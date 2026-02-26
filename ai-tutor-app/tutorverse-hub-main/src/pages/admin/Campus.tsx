@@ -60,24 +60,21 @@ const CampusPage: React.FC = () => {
 
     const columns = [
         {
-            key: "id",
-            label: "Campus ID",
-            render: (item: Campus) => (
-                <span className="text-xs font-medium text-primary bg-primary/10 px-2 py-1 rounded">{item.id}</span>
-            ),
-        },
-        {
             key: "name",
             label: "Campus Name",
             render: (item: Campus) => (
-                <span className="text-sm font-normal text-foreground">{item.name}</span>
+                <span className="text-sm font-normal text-foreground max-w-[150px] truncate inline-block" title={item.name}>
+                    {item.name}
+                </span>
             ),
         },
         {
             key: "address",
             label: "Address",
             render: (item: Campus) => (
-                <span className="text-sm font-normal text-foreground">{item.address || 'N/A'}</span>
+                <span className="text-sm font-normal text-foreground max-w-[180px] truncate inline-block" title={item.address || 'N/A'}>
+                    {item.address || 'N/A'}
+                </span>
             ),
         },
     ];
