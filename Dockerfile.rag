@@ -8,14 +8,11 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     curl \
     poppler-utils \
     libreoffice \
-<<<<<<< HEAD
-=======
     libreoffice-writer \
     libreoffice-impress \
     libxt6 \
     libxext6 \
     libxrender1 \
->>>>>>> acc4a3c412df43494c5c81210b044e889b5b0dc8
     && rm -rf /var/lib/apt/lists/*
 
 # Copy requirements
