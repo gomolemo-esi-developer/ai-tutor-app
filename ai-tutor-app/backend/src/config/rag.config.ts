@@ -13,11 +13,11 @@ export class RAGConfig {
 
   constructor(
     baseUrl: string,
-    timeout: number = 120000, // 2 minutes - allow time for audio transcription with Whisper
+    timeout: number = 900000, // 15 minutes - allow time for video transcription with Whisper
     apiKey?: string,
     enabled: boolean = true,
     retryAttempts: number = 3,
-    retryDelayMs: number = 1000
+    retryDelayMs: number = 2000
   ) {
     this.baseUrl = baseUrl;
     this.timeout = timeout;
@@ -45,11 +45,11 @@ export class RAGConfig {
    */
   static fromEnv(): RAGConfig {
     const baseUrl = process.env.RAG_SERVICE_URL || '';
-    const timeout = parseInt(process.env.RAG_TIMEOUT || '120000', 10); // 2 minutes default
+    const timeout = parseInt(process.env.RAG_TIMEOUT || '900000', 10); // 15 minutes default
     const apiKey = process.env.RAG_API_KEY;
     const enabled = process.env.RAG_ENABLE !== 'false';
     const retryAttempts = parseInt(process.env.RAG_RETRY_ATTEMPTS || '3', 10);
-    const retryDelayMs = parseInt(process.env.RAG_RETRY_DELAY_MS || '1000', 10);
+    const retryDelayMs = parseInt(process.env.RAG_RETRY_DELAY_MS || '2000', 10);
 
     return new RAGConfig(
       baseUrl,

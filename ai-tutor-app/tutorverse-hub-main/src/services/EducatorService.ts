@@ -328,10 +328,11 @@ export const EducatorService = {
         author: data.metadata.author,
         description: data.metadata.description,
       };
-      // Use extended timeout (10 minutes) for file processing
-      // Audio/video transcription with Whisper can take time, with up to 3 retries
+      // Use extended timeout (15 minutes) for file processing
+      // Video transcription with Whisper can take 30-60 seconds per 10MB file
+      // Multiple retries can extend this to 15+ minutes for large files
       return await apiClient.post('/api/educator/files', payload, {
-        timeout: 10 * 60 * 1000, // 10 minutes (to allow for RAG retries)
+        timeout: 15 * 60 * 1000, // 15 minutes (to allow for RAG processing + 3 retries)
       });
     } catch (error) {
       console.error('Failed to save file:', error);

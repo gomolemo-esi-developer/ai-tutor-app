@@ -8,6 +8,7 @@ import uuid
 import json
 import asyncio
 import httpx
+from concurrent.futures import ThreadPoolExecutor
 
 sys.path.append(str(Path(__file__).parent.parent))
 
@@ -23,6 +24,9 @@ router = APIRouter(prefix="/educator", tags=["educator"])
 
 DATA_INPUT_DIR = Path(__file__).parent.parent / "data" / "input"
 DATA_INPUT_DIR.mkdir(parents=True, exist_ok=True)
+
+# Thread pool for async conversion (avoids blocking on file processing)
+executor = ThreadPoolExecutor(max_workers=2)
 
 async def process_document_with_progress(
     file_path: Path, 
@@ -55,7 +59,14 @@ async def process_document_with_progress(
         yield json.dumps({"status": "converting", "progress": 15, "message": f"Converting {file_type} to text..."}) + "\n"
         await asyncio.sleep(0.1)
         
-        text = converter.convert_to_text(str(file_path), progress_callback)
+        # Run in thread pool to avoid blocking (file conversion can take 30+ seconds)
+        loop = asyncio.get_event_loop()
+        text = await loop.run_in_executor(
+            executor,
+            converter.convert_to_text,
+            str(file_path),
+            progress_callback
+        )
         
         if not text:
             raise ValueError("Failed to extract text from file")

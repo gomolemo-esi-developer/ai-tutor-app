@@ -113,14 +113,15 @@ export class RAGService {
                     ? `/educator/upload?callback_url=${encodeURIComponent(callbackUrl)}`
                     : '/educator/upload';
 
-                // FIX (2026-02-19): Simplify response handling
-                // Use axios default behavior which buffers the response
-                // Then parse the NDJSON response as text
+                // FIX (2026-02-19): Improve response handling for large video files
+                // Use axios with extended timeout to allow video transcription
+                // The timeout is already set in the axios instance, but we can override per request
                 const response = await this.client.post(uploadUrl, formData, {
                     headers: { 'Content-Type': 'multipart/form-data' },
-                    // Let axios handle response buffering/parsing
-                    // Since we expect NDJSON, we need to handle it specially
-                    validateStatus: () => true  // Don't throw on any status code
+                    // Override timeout for this specific request (use full 15 minutes)
+                    timeout: Math.max(this.config.timeout, 15 * 60 * 1000),
+                    // Don't throw on any status code - we'll handle errors in response parsing
+                    validateStatus: () => true
                 });
 
                 // Parse ndjson response - response.data should be a string containing newline-delimited JSON
@@ -209,15 +210,24 @@ export class RAGService {
                     status: 'complete'
                 };
             } catch (error) {
+                const errorMsg = error instanceof Error ? error.message : String(error);
                 LoggerUtil.warn(`[RAG] Upload failed (attempt ${attempt}/${this.config.retryAttempts})`, {
                     fileName,
-                    error: error instanceof Error ? error.message : String(error)
+                    error: errorMsg,
+                    fileSize: file.length
                 });
 
                 if (attempt < this.config.retryAttempts) {
+                    // Exponential backoff with longer delays for stream errors
+                    // Stream abort typically means RAG service is still processing
                     const delay = this.config.retryDelayMs * Math.pow(2, attempt - 1);
+                    LoggerUtil.info(`[RAG] Retrying in ${delay}ms`, { fileName });
                     await new Promise(resolve => setTimeout(resolve, delay));
                 } else {
+                    LoggerUtil.error(`[RAG] Upload failed after ${this.config.retryAttempts} attempts`, {
+                        fileName,
+                        lastError: errorMsg
+                    });
                     throw error;
                 }
             }
