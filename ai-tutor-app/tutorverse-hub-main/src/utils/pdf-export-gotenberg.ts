@@ -1,4 +1,5 @@
 import axios from 'axios';
+import { createGlobalApiClient } from '@/services/apiClient';
 
 interface PDFExportOptions {
   filename: string;
@@ -21,43 +22,15 @@ export const exportHTMLToPDFGotenberg = async (
   options: PDFExportOptions
 ): Promise<void> => {
   try {
-    const formData = new FormData();
     const htmlWithStyles = wrapHTMLWithStyles(html, options.title);
-    formData.append('files', new Blob([htmlWithStyles], { type: 'text/html' }), 'document.html');
-
-    // Gotenberg API options
-    formData.append('landscape', 'false');
-    formData.append('paperWidth', '8.27'); // A4 width in inches
-    formData.append('paperHeight', '11.69'); // A4 height in inches
-    formData.append('marginTop', '0.5');
-    formData.append('marginBottom', '0.5');
-    formData.append('marginLeft', '0.5');
-    formData.append('marginRight', '0.5');
-    formData.append('preferCssPageSize', 'true');
-    formData.append('printBackground', 'true');
-
-    const response = await axios.post(
-      `${GOTENBERG_URL}/forms/chromium/convert/html`,
-      formData,
-      {
-        responseType: 'arraybuffer',
-        headers: {
-          'Content-Type': 'multipart/form-data',
-        },
-        timeout: 30000,
-      }
-    );
-
-    // Create blob and trigger download
-    const blob = new Blob([response.data], { type: 'application/pdf' });
-    const url = window.URL.createObjectURL(blob);
-    const link = document.createElement('a');
-    link.href = url;
-    link.download = options.filename;
-    document.body.appendChild(link);
-    link.click();
-    document.body.removeChild(link);
-    window.URL.revokeObjectURL(url);
+    
+    // Always use backend proxy - more reliable and handles CORS
+    try {
+      await generatePDFViaBackend(htmlWithStyles, options);
+    } catch (backendError) {
+      console.error('Backend PDF generation failed:', backendError);
+      throw backendError;
+    }
   } catch (error) {
     console.error('Gotenberg PDF export error:', error);
     throw new Error(
@@ -65,6 +38,59 @@ export const exportHTMLToPDFGotenberg = async (
     );
   }
 };
+
+/**
+ * Generate PDF through backend to avoid CORS issues
+ * Uses JWT token stored in localStorage for authentication
+ */
+async function generatePDFViaBackend(
+  html: string,
+  options: PDFExportOptions
+): Promise<void> {
+  // Get token from localStorage (set by AuthContext on login)
+  const token = localStorage.getItem('jwt_token');
+  
+  if (!token) {
+    throw new Error('Authentication required for PDF generation. Please log in.');
+  }
+
+  const apiClient = createGlobalApiClient();
+  const backendURL = apiClient.getBaseURL();
+  
+  const response = await axios.post(
+    `${backendURL}/api/pdf/generate`,
+    {
+      html,
+      filename: options.filename,
+      title: options.title,
+    },
+    {
+      responseType: 'arraybuffer',
+      timeout: 60000,
+      headers: {
+        'Authorization': `Bearer ${token}`,
+        'Content-Type': 'application/json',
+      },
+    }
+  );
+
+  downloadPDF(response.data, options.filename);
+}
+
+/**
+ * Helper to trigger PDF download
+ */
+function downloadPDF(pdfData: ArrayBuffer, filename: string): void {
+  const blob = new Blob([pdfData], { type: 'application/pdf' });
+  const url = window.URL.createObjectURL(blob);
+  const link = document.createElement('a');
+  link.href = url;
+  link.download = filename;
+  document.body.appendChild(link);
+  link.click();
+  document.body.removeChild(link);
+  window.URL.revokeObjectURL(url);
+}
 
 /**
  * Export a DOM element to PDF using Gotenberg
@@ -83,45 +109,92 @@ export const exportElementToPDFGotenberg = async (
     // Clone the element to avoid modifying the original
     const clonedElement = element.cloneNode(true) as HTMLElement;
 
-    // Remove buttons and interactive elements
-    const buttons = clonedElement.querySelectorAll('button');
-    buttons.forEach((button) => {
-      const text = button.textContent?.toLowerCase() || '';
-      if (
-        text.includes('back') ||
-        text.includes('download') ||
-        text.includes('quiz') ||
-        text.includes('chat') ||
-        text.includes('ask ai') ||
-        text.includes('retake') ||
-        text.includes('browse')
-      ) {
-        button.remove();
+    // Step 1: Remove all buttons first
+    clonedElement.querySelectorAll('button').forEach((btn) => btn.remove());
+
+    // Step 2: Remove all SVG icons (trophy, check marks, X marks that are too large)
+    clonedElement.querySelectorAll('svg').forEach((svg) => {
+      svg.remove();
+    });
+
+    // Step 3: Remove the header (contains back button, title, PDF button)
+    // Find the flex container with the title and buttons
+    const flexContainers = Array.from(clonedElement.querySelectorAll('div'));
+    flexContainers.forEach((div) => {
+      const text = div.textContent || '';
+      // Look for header pattern: contains ArrowLeft button area and PDF button area
+      const hasTitle = div.querySelector('h1');
+      if (hasTitle && text.includes('Quiz Results')) {
+        // This is the header - check if it's a direct parent of h1
+        const parent = hasTitle?.parentElement?.parentElement;
+        if (parent && parent === div) {
+          div.remove();
+        }
       }
     });
 
-    // Remove metadata elements
-    const allElements = clonedElement.querySelectorAll('[class*="Card"], [class*="card"]');
-    allElements.forEach((el) => {
-      const text = el.textContent || '';
+    // Step 4: Remove CardContent sections (contains score messages and action buttons)
+    clonedElement.querySelectorAll('[class*="CardContent"]').forEach((content) => {
+      content.remove();
+    });
+
+    // Step 5: Remove bottom action buttons section
+    const flexDivs = Array.from(clonedElement.querySelectorAll('div'));
+    flexDivs.forEach((div) => {
+      const text = div.textContent || '';
+      // Remove sections containing bottom action buttons
+      if (
+        text.includes('Retake Quiz') &&
+        text.includes('Browse More Modules') &&
+        !text.includes('Question Breakdown')
+      ) {
+        div.remove();
+      }
+    });
+
+    // Step 6: Remove metadata and extra sections
+    clonedElement.querySelectorAll('[class*="Card"]').forEach((card) => {
+      const text = card.textContent || '';
       if (text.includes('Read Time') || text.includes('Topics')) {
+        card.remove();
+      }
+    });
+
+    // Step 7: Remove Topics Covered sections
+    clonedElement.querySelectorAll('h3, h2').forEach((heading) => {
+      if (heading.textContent?.includes('Topics')) {
+        heading.nextElementSibling?.remove();
+        heading.remove();
+      }
+    });
+
+    // Step 8: Remove separators
+    clonedElement.querySelectorAll('[class*="separator"], [class*="Separator"]').forEach((sep) => sep.remove());
+
+    // Step 9: Remove empty elements (divs, spans, etc. with no text content and no children)
+    const emptyElements = Array.from(clonedElement.querySelectorAll('*'));
+    emptyElements.forEach((el) => {
+      // Skip certain elements that should be kept even if empty
+      if (el.tagName === 'HTML' || el.tagName === 'BODY') return;
+      
+      const text = el.textContent?.trim() || '';
+      const hasChildren = el.children.length > 0;
+      
+      // Remove if truly empty
+      if (!text && !hasChildren) {
         el.remove();
       }
-    });
-
-    // Remove Topics Covered section
-    const headings = clonedElement.querySelectorAll('h3, h2');
-    headings.forEach((heading) => {
-      if (heading.textContent?.includes('Topics')) {
-        const nextEl = heading.nextElementSibling;
-        heading.remove();
-        if (nextEl) nextEl.remove();
+      // Remove decorative empty divs/spans (common in React components)
+      else if (!text && el.tagName === 'DIV') {
+        // Check if it's a decorative container with no meaningful content
+        const children = Array.from(el.children);
+        const hasOnlyEmptyChildren = children.length > 0 && 
+          children.every(child => !child.textContent?.trim());
+        if (hasOnlyEmptyChildren) {
+          el.remove();
+        }
       }
     });
-
-    // Remove separators
-    const separators = clonedElement.querySelectorAll('[class*="separator"], [class*="Separator"]');
-    separators.forEach((sep) => sep.remove());
 
     // Get the outer HTML
     const html = clonedElement.outerHTML;
@@ -136,6 +209,7 @@ export const exportElementToPDFGotenberg = async (
 
 /**
  * Wrap HTML with proper styling for PDF output
+ * Preserves the visual design from the website
  */
 function wrapHTMLWithStyles(html: string, title?: string): string {
   return `
@@ -155,212 +229,328 @@ function wrapHTMLWithStyles(html: string, title?: string): string {
         body {
           font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
           line-height: 1.6;
-          color: #333;
+          color: #1f2937;
           background: #ffffff;
-          padding: 20px;
+          padding: 30px 20px;
           font-size: 14px;
         }
 
         h1, h2, h3, h4, h5, h6 {
-          margin-top: 16px;
-          margin-bottom: 8px;
           font-weight: 600;
           line-height: 1.3;
-          color: #000;
+          color: #1f2937;
           page-break-after: avoid;
+          margin-bottom: 0.5em;
         }
 
         h1 {
-          font-size: 24px;
-          border-bottom: 2px solid #ddd;
-          padding-bottom: 8px;
+          font-size: 28px;
+          margin-top: 0;
+          margin-bottom: 1em;
+          border-bottom: 3px solid #0ea5e9;
+          padding-bottom: 0.5em;
         }
 
         h2 {
           font-size: 20px;
-          margin-top: 20px;
+          margin-top: 1.5em;
         }
 
         h3 {
           font-size: 16px;
+          margin-top: 1em;
         }
 
         p {
-          margin: 8px 0;
+          margin: 0.8em 0;
           line-height: 1.6;
         }
 
         ul, ol {
-          margin: 12px 0;
-          padding-left: 24px;
+          margin: 1em 0;
+          padding-left: 2em;
         }
 
         li {
-          margin: 6px 0;
+          margin: 0.4em 0;
           line-height: 1.6;
         }
 
-        /* Card styling for quiz results */
-        [class*="card"], [class*="Card"] {
-          border: 1px solid #ddd;
-          border-radius: 4px;
-          padding: 16px;
-          margin: 16px 0;
-          background: #fafafa;
+        /* Card styling - matches Tailwind card design */
+        .rounded-lg, [class*="rounded"] {
+          border-radius: 8px;
+        }
+
+        /* Main card container */
+        [class*="Card"] {
+          border: 1px solid #e5e7eb;
+          border-radius: 8px;
+          padding: 1.5em;
+          margin: 1.5em 0;
+          background: #ffffff;
+          page-break-inside: avoid;
+          box-shadow: 0 1px 3px rgba(0, 0, 0, 0.05);
+        }
+
+        /* Score card - Trophy section */
+        [class*="Card"] {
+          background: #ffffff;
+          border: 1px solid #e5e7eb;
+          border-radius: 8px;
+          padding: 1.5em;
+          margin: 1.5em 0;
           page-break-inside: avoid;
         }
 
-        /* Score display styling */
-        .score-card {
+        [class*="CardHeader"] {
           text-align: center;
-          background: #f0f9ff;
-          border-left: 4px solid #0066cc;
-          padding: 20px;
-          margin: 20px 0;
-          border-radius: 4px;
-          page-break-inside: avoid;
+          padding-bottom: 0.5em;
+          border-bottom: none;
         }
 
-        .score-percentage {
+        /* Trophy icon styling */
+        svg, .trophy {
+          width: 60px;
+          height: 60px;
+          margin: 0 auto 1em;
+          display: block;
+        }
+
+        /* Large percentage display */
+        .percentage, [class*="text-5xl"], [class*="text-4xl"] {
           font-size: 48px;
-          font-weight: bold;
-          color: #0066cc;
-          margin: 10px 0;
+          font-weight: 700;
+          margin: 0.5em 0;
         }
 
-        .score-message {
-          font-size: 16px;
-          font-weight: 500;
-          margin: 10px 0;
+        /* Color classes for scores */
+        .text-green-500, [class*="green"] {
+          color: #10b981;
         }
 
-        /* Question result styling */
-        .question-result {
-          border-left: 4px solid #999;
-          padding: 16px;
-          margin: 12px 0;
-          background: #f9f9f9;
+        .text-yellow-500, [class*="yellow"] {
+          color: #f59e0b;
+        }
+
+        .text-red-500, [class*="red"] {
+          color: #ef4444;
+        }
+
+        /* Result cards - green for correct, red for incorrect */
+        .border-l-4, [class*="border-l"] {
+          border-left: 5px solid #999;
+          padding: 1em;
+          margin: 1em 0;
+          background: #f9fafb;
+          border-radius: 0;
           page-break-inside: avoid;
+          display: block;
+          border-top: none;
+          border-right: none;
+          border-bottom: none;
         }
 
-        .question-result.correct {
-          border-left-color: #22c55e;
+        .border-l-green-500, [class*="bg-green"] {
+          border-left-color: #10b981;
           background: #f0fdf4;
         }
 
-        .question-result.incorrect {
+        .border-l-red-500, [class*="bg-red"] {
           border-left-color: #ef4444;
           background: #fef2f2;
         }
 
-        .question-text {
-          font-weight: 500;
-          margin-bottom: 8px;
-          font-size: 14px;
+        /* Flex container for question items - ensure vertical layout */
+        [class*="border-l"] > div {
+          display: flex !important;
+          flex-direction: column !important;
+          gap: 0.5em;
         }
 
-        .question-type {
-          display: inline-block;
-          background: #e5e7eb;
-          padding: 4px 8px;
-          border-radius: 3px;
-          font-size: 12px;
-          margin-top: 8px;
+        /* Make sure content in question cards stacks vertically */
+        [class*="border-l"][class*="bg-"] > div > div {
+          display: flex !important;
+          flex-direction: column !important;
+          gap: 0.8em;
         }
 
-        .answer-row {
-          margin: 8px 0;
-          font-size: 13px;
+        /* Force vertical layout for all flex-row items in question cards */
+        [class*="border-l"] [class*="flex-row"],
+        [class*="border-l"] [class*="flex-col"] {
+          flex-direction: column !important;
         }
 
-        .answer-label {
-          color: #666;
-          display: inline-block;
-          min-width: 120px;
-          font-weight: 500;
+        /* Grid to vertical in question cards */
+        [class*="border-l"] .grid {
+          display: flex !important;
+          flex-direction: column !important;
+          grid-template-columns: unset !important;
         }
 
-        .answer-value {
-          font-weight: 500;
+        /* Hide SVG icons */
+        svg {
+          display: none;
         }
 
-        .answer-value.correct {
-          color: #16a34a;
+        /* Check and X circles */
+        .text-green-600 {
+          color: #059669;
         }
 
-        .answer-value.incorrect {
+        .text-red-600 {
           color: #dc2626;
         }
 
-        /* Badge styling */
-        [class*="badge"], [class*="tag"], [class*="pill"],
-        span[class*="rounded"] {
-          background: #e5e7eb;
-          border: none;
-          padding: 4px 8px;
-          border-radius: 3px;
-          font-size: 12px;
-          display: inline-block;
-          margin: 2px 4px 2px 0;
+        /* Answer section - vertical layout */
+        .answer-section {
+          display: flex;
+          flex-direction: column;
+          gap: 0.4em;
+        }
+
+        /* Typography for answers */
+        .font-medium, [class*="font-medium"] {
           font-weight: 500;
-          color: #333;
+        }
+
+        .font-bold, [class*="font-bold"] {
+          font-weight: 700;
+        }
+
+        .text-muted-foreground, [class*="muted"] {
+          color: #6b7280;
+          font-size: 0.875em;
+        }
+
+        /* Badge/tag styling */
+        [class*="badge"], [class*="tag"], [class*="pill"],
+        [class*="rounded-full"] {
+          background: #f3f4f6;
+          border: 1px solid #e5e7eb;
+          padding: 0.4em 0.8em;
+          border-radius: 9999px;
+          font-size: 0.8em;
+          display: inline-block;
+          margin: 0.25em 0.5em 0.25em 0;
+          font-weight: 500;
+          color: #374151;
           vertical-align: middle;
+        }
+
+        /* Question text and breakdown */
+        .question-num {
+          color: #9ca3af;
+          margin-right: 0.5em;
+          font-weight: 500;
+        }
+
+        .question-text {
+          font-weight: 500;
+          margin-bottom: 0.8em;
+          color: #1f2937;
+        }
+
+        /* Answer rows with proper spacing */
+        .answer-section {
+          margin: 0.8em 0;
+          font-size: 0.95em;
+          display: flex;
+          justify-content: space-between;
+          gap: 1em;
+        }
+
+        .answer-label {
+          color: #6b7280;
+          font-weight: 500;
+          min-width: 140px;
+        }
+
+        .answer-value {
+          font-weight: 600;
+          flex: 1;
+        }
+
+        /* Grid layout for answer rows - override for vertical */
+        .grid {
+          display: flex !important;
+          flex-direction: column !important;
+          gap: 0.8em;
+          align-items: unset;
         }
 
         /* Table styling */
         table {
           width: 100%;
           border-collapse: collapse;
-          margin: 16px 0;
+          margin: 1.5em 0;
         }
 
         thead {
-          background: #f3f4f6;
+          background: #f9fafb;
         }
 
         th, td {
           border: 1px solid #e5e7eb;
-          padding: 12px;
+          padding: 1em;
           text-align: left;
         }
 
         th {
           font-weight: 600;
           background: #f3f4f6;
+          color: #1f2937;
         }
 
         /* Page break handling */
         @page {
           size: A4;
-          margin: 12mm;
+          margin: 15mm;
         }
 
-        /* Avoid breaking elements */
-        [class*="card"], [class*="Card"],
-        .question-result,
-        .score-card {
+        /* Avoid breaking important elements */
+        [class*="Card"],
+        [class*="card"],
+        [class*="border-l"],
+        .score-section,
+        .question-item {
           page-break-inside: avoid;
         }
 
-        /* Print styles */
+        /* Spacing helpers */
+        .mb-4, .mb-6, .mb-8 {
+          margin-bottom: 1.5em;
+        }
+
+        .mt-4, .mt-6, .mt-8 {
+          margin-top: 1.5em;
+        }
+
+        .gap-3, .gap-4 {
+          gap: 1em;
+        }
+
+        /* Print-specific styles */
         @media print {
           body {
             background: white;
           }
 
           a {
-            color: #0066cc;
+            color: #0ea5e9;
             text-decoration: none;
           }
 
           button {
             display: none;
           }
+
+          .no-print {
+            display: none;
+          }
         }
       </style>
     </head>
     <body>
-      ${title ? `<h1>${title}</h1>` : ''}
       ${html}
     </body>
     </html>

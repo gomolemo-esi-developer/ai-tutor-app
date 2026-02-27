@@ -21,20 +21,29 @@ const QuizResults: React.FC = () => {
   const { moduleCode } = useParams<{ moduleCode: string }>();
   const [searchParams] = useSearchParams();
   const navigate = useNavigate();
-  const contentId = searchParams.get('contentId');
+  const contentIds = searchParams.get('contentIds');
 
   const [results, setResults] = useState<QuizResult[]>([]);
 
   useEffect(() => {
     const storedResults = sessionStorage.getItem('quizResults');
     if (storedResults) {
-      setResults(JSON.parse(storedResults));
+      const parsed = JSON.parse(storedResults);
+      // Ensure results is always an array
+      if (Array.isArray(parsed)) {
+        setResults(parsed);
+      } else if (parsed && typeof parsed === 'object') {
+        // If it's a single result object, wrap it in an array
+        setResults([parsed]);
+      } else {
+        navigate(`/modules/${moduleCode}/quiz?contentIds=${contentIds}`);
+      }
     } else {
-      navigate(`/modules/${moduleCode}/quiz?contentId=${contentId}`);
+      navigate(`/modules/${moduleCode}/quiz?contentIds=${contentIds}`);
     }
-  }, [moduleCode, contentId, navigate]);
+  }, [moduleCode, contentIds, navigate]);
 
-  const correctCount = results.filter((r) => r.isCorrect).length;
+  const correctCount = Array.isArray(results) ? results.filter((r) => r.isCorrect).length : 0;
   const totalQuestions = results.length;
   const percentage =
     totalQuestions > 0 ? Math.round((correctCount / totalQuestions) * 100) : 0;
@@ -53,7 +62,7 @@ const QuizResults: React.FC = () => {
 
   const handleRetakeQuiz = () => {
     sessionStorage.removeItem('quizResults');
-    navigate(`/modules/${moduleCode}/quiz?contentId=${contentId}`);
+    navigate(`/modules/${moduleCode}/quiz?contentIds=${contentIds}`);
   };
 
   if (results.length === 0) {
@@ -140,7 +149,7 @@ const QuizResults: React.FC = () => {
             <div className="space-y-3 md:space-y-4">
               {results.map((result, index) => (
                 <Card
-                  key={result.id}
+                  key={result.id || index}
                   className={`p-4 md:p-5 border-l-4 ${
                     result.isCorrect
                       ? 'border-l-green-500 bg-green-500/5'

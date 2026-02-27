@@ -167,6 +167,7 @@ const Quiz: React.FC = () => {
 
   const [answers, setAnswers] = useState<Record<string, string>>({});
   const [questions, setQuestions] = useState<Question[]>([]);
+  const [quizId, setQuizId] = useState<string | null>(null);
 
   const { post: postQuiz, loading } = useApi<Question[]>();
 
@@ -180,15 +181,31 @@ const Quiz: React.FC = () => {
   const primaryContent = contentItems[0];
 
   useEffect(() => {
-    if (contentIds || selectedContent.length > 0) {
-      fetchQuestions();
-    } else {
-      // Fallback to mock questions if no content provided
-      setQuestions(
-        generateMockQuestions(primaryContent?.title || "Selected Content")
-      );
-    }
-  }, [contentIds, selectedContent]);
+     let isMounted = true;
+     
+     if (contentIds || selectedContent.length > 0) {
+       fetchQuestions().then(() => {
+         if (isMounted) {
+           // Response already handled in fetchQuestions
+         }
+       }).catch(() => {
+         if (isMounted) {
+           // Error already handled in fetchQuestions
+         }
+       });
+     } else {
+       // Fallback to mock questions if no content provided
+       if (isMounted) {
+         setQuestions(
+           generateMockQuestions(primaryContent?.title || "Selected Content")
+         );
+       }
+     }
+     
+     return () => {
+       isMounted = false;
+     };
+   }, [contentIds, selectedContent]);
 
   const fetchQuestions = async () => {
     try {
@@ -198,10 +215,16 @@ const Quiz: React.FC = () => {
           contentIds?.split(",") || selectedContent.map((c) => (c as any).id),
         numQuestions: 20,
         difficulty: "MEDIUM",
-      }, { timeout: 60000 });
+      });
       // Response structure: { success: true, data: { quizId, questions, ... }, message }
       const quizData = response as any;
       const questions = quizData?.questions || [];
+      
+      // Extract and store quiz ID for submission
+      if (quizData?.quizId) {
+        setQuizId(quizData.quizId);
+      }
+      
       setQuestions(
         questions.length > 0
           ? questions
@@ -226,48 +249,56 @@ const Quiz: React.FC = () => {
 
   const handleSubmit = async () => {
     try {
-      const results = questions.map((q) => ({
+      // Build local results for display
+      const quizResults = questions.map((q) => ({
+        id: q.questionId,
+        type: q.type,
+        question: q.question,
+        options: q.options,
+        correctAnswer: typeof q.correctAnswer === "string" ? q.correctAnswer : q.correctAnswer?.[0] || "",
+        userAnswer: answers[q.questionId] || "",
+        isCorrect: answers[q.questionId]
+          ? (answers[q.questionId] || "").toLowerCase().trim() ===
+            (typeof q.correctAnswer === "string" ? q.correctAnswer : q.correctAnswer?.[0] || "").toLowerCase().trim()
+          : false,
+      }));
+
+      // Submit to API with quizId in the path
+      if (!quizId) {
+        throw new Error('Quiz ID not found. Please regenerate the quiz.');
+      }
+      
+      const submissionData = questions.map((q) => ({
         questionId: q.questionId,
         userAnswer: answers[q.questionId] || "",
       }));
-
-      // Submit to API
-      const response = await postQuiz("/api/quiz/submit", {
-        answers: results,
-        moduleCode,
+      
+      await postQuiz(`/api/quiz/${quizId}/submit`, {
+        answers: submissionData,
       });
 
-      sessionStorage.setItem(
-        "quizResults",
-        JSON.stringify(
-          response ||
-            questions.map((q) => ({
-              ...q,
-              userAnswer: answers[q.questionId] || "",
-              isCorrect: answers[q.questionId]
-                ? (answers[q.questionId] || "").toLowerCase().trim() ===
-                  (typeof q.correctAnswer === "string" ? q.correctAnswer : q.correctAnswer[0]).toLowerCase().trim()
-                : false,
-              wasAnswered: !!answers[q.questionId],
-            }))
-        )
-      );
+      // Store local results (don't depend on API response)
+      sessionStorage.setItem("quizResults", JSON.stringify(quizResults));
       sessionStorage.setItem("quizModuleCode", moduleCode || "");
       sessionStorage.setItem("quizContentIds", contentIds || "");
       navigate(`/modules/${moduleCode}/quiz-results?contentIds=${contentIds}`);
     } catch (err) {
       // Fall back to local evaluation
-      const results = questions.map((q) => ({
-        ...q,
+      console.error("Failed to submit quiz:", err);
+      const quizResults = questions.map((q) => ({
+        id: q.questionId,
+        type: q.type,
+        question: q.question,
+        options: q.options,
+        correctAnswer: typeof q.correctAnswer === "string" ? q.correctAnswer : q.correctAnswer?.[0] || "",
         userAnswer: answers[q.questionId] || "",
         isCorrect: answers[q.questionId]
           ? (answers[q.questionId] || "").toLowerCase().trim() ===
-            (typeof q.correctAnswer === "string" ? q.correctAnswer : q.correctAnswer[0]).toLowerCase().trim()
+            (typeof q.correctAnswer === "string" ? q.correctAnswer : q.correctAnswer?.[0] || "").toLowerCase().trim()
           : false,
-        wasAnswered: !!answers[q.questionId],
       }));
 
-      sessionStorage.setItem("quizResults", JSON.stringify(results));
+      sessionStorage.setItem("quizResults", JSON.stringify(quizResults));
       sessionStorage.setItem("quizModuleCode", moduleCode || "");
       sessionStorage.setItem("quizContentIds", contentIds || "");
       navigate(`/modules/${moduleCode}/quiz-results?contentIds=${contentIds}`);

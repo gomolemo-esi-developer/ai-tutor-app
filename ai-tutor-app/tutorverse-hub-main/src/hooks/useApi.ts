@@ -19,9 +19,9 @@ interface UseApiReturn<T = any> {
   data: T | null;
   loading: boolean;
   error: string | null;
-  get: (endpoint: string) => Promise<T | null>;
-  post: (endpoint: string, body: Record<string, unknown>) => Promise<T | null>;
-  put: (endpoint: string, body: Record<string, unknown>) => Promise<T | null>;
+  get: (endpoint: string, options?: { timeout?: number }) => Promise<T | null>;
+  post: (endpoint: string, body: Record<string, unknown>, options?: { timeout?: number }) => Promise<T | null>;
+  put: (endpoint: string, body: Record<string, unknown>, options?: { timeout?: number }) => Promise<T | null>;
   delete: (endpoint: string) => Promise<boolean>;
   del: (endpoint: string) => Promise<boolean>;
 }
@@ -42,7 +42,7 @@ export const useApi = <T = any>(): UseApiReturn<T> => {
         import.meta.env.VITE_API_URL ||
         import.meta.env.VITE_API_BASE_URL ||
         'http://localhost:3000',
-      timeout: 30000,
+      timeout: 120000, // 120 seconds to allow long-running operations like quiz generation
       debug: import.meta.env.DEV,
     });
 
@@ -61,7 +61,8 @@ export const useApi = <T = any>(): UseApiReturn<T> => {
     async (
       endpoint: string,
       method: 'GET' | 'POST' | 'PUT' | 'DELETE',
-      body?: Record<string, unknown>
+      body?: Record<string, unknown>,
+      options?: { timeout?: number }
     ) => {
       const cacheKey = `${method}:${endpoint}`;
       
@@ -80,6 +81,7 @@ export const useApi = <T = any>(): UseApiReturn<T> => {
           console.log(`📡 [${method}] Requesting: ${endpoint}`, {
             hasToken: !!token,
             baseURL: apiClient.getToken ? 'client ready' : 'no client',
+            timeout: options?.timeout,
           });
 
           let response: T | null = null;
@@ -87,9 +89,9 @@ export const useApi = <T = any>(): UseApiReturn<T> => {
           if (method === 'GET') {
             response = await apiClient.get<T>(endpoint);
           } else if (method === 'POST') {
-            response = await apiClient.post<T>(endpoint, body);
+            response = await apiClient.post<T>(endpoint, body, options);
           } else if (method === 'PUT') {
-            response = await apiClient.put<T>(endpoint, body);
+            response = await apiClient.put<T>(endpoint, body, options);
           } else if (method === 'DELETE') {
             response = await apiClient.delete<T>(endpoint);
           }
@@ -119,19 +121,19 @@ export const useApi = <T = any>(): UseApiReturn<T> => {
   );
 
   const get = useCallback(
-    (endpoint: string) => handleRequest(endpoint, 'GET'),
+    (endpoint: string, options?: { timeout?: number }) => handleRequest(endpoint, 'GET', undefined, options),
     [handleRequest]
   );
 
   const post = useCallback(
-    (endpoint: string, body: any) =>
-      handleRequest(endpoint, 'POST', body),
+    (endpoint: string, body: any, options?: { timeout?: number }) =>
+      handleRequest(endpoint, 'POST', body, options),
     [handleRequest]
   );
 
   const put = useCallback(
-    (endpoint: string, body: any) =>
-      handleRequest(endpoint, 'PUT', body),
+    (endpoint: string, body: any, options?: { timeout?: number }) =>
+      handleRequest(endpoint, 'PUT', body, options),
     [handleRequest]
   );
 

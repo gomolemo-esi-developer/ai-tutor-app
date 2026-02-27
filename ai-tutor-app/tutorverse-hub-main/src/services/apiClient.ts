@@ -294,7 +294,7 @@ export const createGlobalApiClient = (): ApiClient => {
 
   return createApiClient({
     baseURL,
-    timeout: 60000, // 60 seconds default for faster operations
+    timeout: 120000, // 120 seconds default for long-running operations like quiz generation
     debug,
   });
 };

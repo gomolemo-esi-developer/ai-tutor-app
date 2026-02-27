@@ -102,6 +102,9 @@ import {
   batchGenerateTitlesHandler,
 } from './lambda/ai/handler';
 
+// PDF generation handler
+import { handler as generatePDFHandler } from './lambda/ai/pdf';
+
 // NEW: User profile picture handlers
 import {
   handleGetUploadLink,
@@ -181,9 +184,26 @@ const adaptLambdaHandler = (handler: any) => {
 
       if (result && result.statusCode) {
         res.status(result.statusCode);
-        if (result.body) {
-          const bodyData = typeof result.body === 'string' ? JSON.parse(result.body) : result.body;
-          res.json(bodyData);
+        
+        // Handle binary responses (PDFs, images, etc.)
+        if (result.isBase64Encoded && result.body) {
+          // Set appropriate content type headers from Lambda response
+          if (result.headers) {
+            Object.entries(result.headers).forEach(([key, value]) => {
+              res.setHeader(key, String(value));
+            });
+          }
+          // Send base64-encoded binary data
+          res.send(Buffer.from(result.body, 'base64'));
+        } else if (result.body) {
+          // For JSON responses, parse and send
+          try {
+            const bodyData = typeof result.body === 'string' ? JSON.parse(result.body) : result.body;
+            res.json(bodyData);
+          } catch (parseError) {
+            // If not JSON, send as plain text
+            res.send(result.body);
+          }
         } else {
           res.send('');
         }
@@ -617,6 +637,14 @@ app.post('/api/summary/generate',
   roleMiddleware(['STUDENT']),
   quizLimiter,
   adaptLambdaHandler(generateSummaryHandler)
+);
+
+/**
+ * PDF Generation routes
+ */
+app.post('/api/pdf/generate',
+  authMiddleware,
+  adaptLambdaHandler(generatePDFHandler)
 );
 
 /**

@@ -50,7 +50,7 @@ export const QuizService = {
     numberOfQuestions?: number;
   }): Promise<Quiz> {
     try {
-      return await apiClient.post('/api/quiz/generate', data, { timeout: 60000 });
+      return await apiClient.post('/api/quiz/generate', data, { timeout: 120000 });
     } catch (error) {
       console.error('Failed to generate quiz:', error);
       throw error;
