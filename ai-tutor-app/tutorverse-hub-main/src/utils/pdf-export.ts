@@ -37,33 +37,34 @@ export const exportElementToPDF = async (
           box-shadow: none !important;
         }
         
-        /* Hide quick stats (Read Time, Topics count) */
-        .pdf-export > div > div:nth-child(3) {
-          display: none !important;
-        }
-        
         /* Hide separators and dividers */
-        .pdf-export [class*="separator"] {
-          display: none !important;
-        }
-        
-        /* Hide Topics Covered section */
-        .pdf-export h3:has(+ div [class*="flex"]),
-        .pdf-export > div > div:last-of-type {
-          display: none !important;
-        }
-        
-        /* Style containers/cards cleanly */
-        .pdf-export [class*="card"], 
-        .pdf-export [class*="Card"] {
-          border: none !important;
-          border-radius: 0 !important;
-          box-shadow: none !important;
-          background: #fafafa !important;
-          padding: 16px !important;
-          margin: 12px 0 !important;
-          page-break-inside: avoid !important;
-        }
+         .pdf-export [class*="separator"] {
+           display: none !important;
+         }
+         
+         /* Header styles - keep compact */
+         .pdf-export header {
+           margin: 0 0 2px 0 !important;
+           padding: 0 !important;
+         }
+         
+         /* Style containers/cards cleanly */
+          .pdf-export [class*="card"], 
+          .pdf-export [class*="Card"] {
+            border: none !important;
+            border-radius: 0 !important;
+            box-shadow: none !important;
+            background: #fafafa !important;
+            padding: 8px !important;
+            margin: 2px 0 !important;
+            page-break-inside: avoid !important;
+            page-break-before: avoid !important;
+          }
+          
+          /* First card stays with header */
+          .pdf-export > div > div:first-child {
+            page-break-before: avoid !important;
+          }
         
         /* Style span tags and badges */
         .pdf-export span {
@@ -91,9 +92,9 @@ export const exportElementToPDF = async (
         .pdf-export h1, 
         .pdf-export h2, 
         .pdf-export h3 {
-          margin: 16px 0 8px 0 !important;
+          margin: 8px 0 4px 0 !important;
           padding: 0 !important;
-          line-height: 1.3 !important;
+          line-height: 1.2 !important;
           font-weight: 600 !important;
           color: #000 !important;
         }
@@ -112,23 +113,35 @@ export const exportElementToPDF = async (
         
         /* Fix paragraph styles */
         .pdf-export p {
-          margin: 6px 0 !important;
+          margin: 2px 0 !important;
           padding: 0 !important;
-          line-height: 1.5 !important;
+          line-height: 1.4 !important;
           color: #333 !important;
         }
         
         /* Fix list styles */
         .pdf-export ul, .pdf-export ol {
-          margin: 8px 0 !important;
-          padding-left: 20px !important;
+          margin: 2px 0 !important;
+          padding-left: 16px !important;
         }
         
         .pdf-export li {
-          margin: 4px 0 !important;
-          line-height: 1.5 !important;
+          margin: 2px 0 !important;
+          line-height: 1.4 !important;
         }
-      `;
+        
+        /* Grid spacing */
+        .pdf-export [class*="grid"] {
+          gap: 2px !important;
+        }
+        
+        /* Card header/content */
+        .pdf-export [class*="CardHeader"],
+        .pdf-export [class*="CardContent"] {
+          padding: 4px !important;
+          margin: 0 !important;
+        }
+        `;
       document.head.appendChild(style);
     }
 
@@ -153,25 +166,7 @@ export const exportElementToPDF = async (
       }
     });
 
-    // Remove Read Time and Topics stats cards
-    const allElements = clonedElement.querySelectorAll('[class*="Card"], [class*="card"]');
-    allElements.forEach(el => {
-      const text = el.textContent || '';
-      if (text.includes('Read Time') || text.includes('Topics')) {
-        el.remove();
-      }
-    });
 
-    // Remove Topics Covered section
-    const headings = clonedElement.querySelectorAll('h3, h2');
-    headings.forEach(heading => {
-      if (heading.textContent?.includes('Topics')) {
-        // Remove the heading and the next sibling (usually the content)
-        const nextEl = heading.nextElementSibling;
-        heading.remove();
-        if (nextEl) nextEl.remove();
-      }
-    });
 
     // Remove separator/divider elements
     const separators = clonedElement.querySelectorAll('[class*="separator"], [class*="Separator"]');

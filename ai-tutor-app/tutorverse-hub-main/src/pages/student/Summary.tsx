@@ -1,6 +1,6 @@
 import React, { useEffect, useState } from 'react';
 import { useParams, useNavigate, useSearchParams } from 'react-router-dom';
-import { ArrowLeft, FileText, Clock, BookOpen, Lightbulb, List, Target } from 'lucide-react';
+import { ArrowLeft, FileText, Lightbulb, List, Target } from 'lucide-react';
 import MainLayout from '@/components/layout/MainLayout';
 import LoadingSpinner from '@/components/ui/loading-spinner';
 import { Button } from '@/components/ui/button';
@@ -194,7 +194,7 @@ const Summary: React.FC = () => {
         <MainLayout>
             <div className="flex-1 p-4 md:p-6 overflow-auto scrollbar-thin">
                 <div className="max-w-3xl mx-auto">
-                    <div className="flex flex-col sm:flex-row gap-3 mb-4">
+                    <div className="flex flex-col sm:flex-row items-center justify-between gap-3 mb-4">
                         <Button
                             variant="ghost"
                             className="w-full sm:w-auto"
@@ -206,63 +206,23 @@ const Summary: React.FC = () => {
                         <PDFDownloadButton
                             elementId="summary-content"
                             filename={`Summary-${contentItems.length > 1 ? 'Multiple' : contentItems[0]?.title || 'Content'}-${getTimestampForFilename()}.pdf`}
-                            title={contentItems.length === 1 ? contentItems[0].title : `Summary of ${contentItems.length} Items`}
-                            className="w-full sm:w-auto"
+                            className="w-full sm:w-auto ml-auto"
                         />
                     </div>
 
-                    <SelectedContentBar showClear={false} className="mb-4" />
+                    <SelectedContentBar showClear={false} className="mb-4 print:hidden" />
 
                     <div id="summary-content" className="print:block">
-                        <header className="mb-6 md:mb-8">
-                        <div className="flex flex-wrap items-center gap-2 md:gap-3 mb-2">
-                            <FileText className="w-4 h-4 md:w-5 md:h-5 text-warning" />
-                            <span className="text-xs md:text-sm font-medium text-warning bg-warning/10 px-3 py-1 rounded-full">
-                                AI Summary
-                            </span>
-                            <span className="text-xs text-muted-foreground">
-                                {contentItems.length} item{contentItems.length > 1 ? 's' : ''} selected
-                            </span>
-                        </div>
-                        <h1 className="text-xl md:text-2xl font-display font-bold text-foreground">
-                            {contentItems.length === 1 ? contentItems[0].title : `Summary of ${contentItems.length} Items`}
-                        </h1>
-                        <p className="text-sm md:text-base text-muted-foreground mt-1">
-                            {moduleCode}
-                        </p>
-                        {contentItems.length > 1 && (
-                            <div className="flex flex-wrap gap-2 mt-3">
-                                {contentItems.map((item) => (
-                                    <span key={(item as any).id} className="text-xs bg-secondary px-2 py-1 rounded-full">
-                                        {item.title}
-                                    </span>
-                                ))}
-                            </div>
-                        )}
-                    </header>
+                         <header className="mb-3 md:mb-4">
+                         <h1 className="text-2xl md:text-3xl font-display font-bold text-foreground">
+                             Learning Summary
+                         </h1>
+                         <p className="text-sm md:text-base text-muted-foreground mt-1">
+                             {contentItems.length === 1 ? contentItems[0].title : `Summary of ${contentItems.length} Items`}
+                         </p>
+                     </header>
 
-                    <div className="grid gap-4 md:gap-6">
-                        {/* Quick Stats */}
-                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 md:gap-4">
-                            <Card className="bg-card border-border card-elevated">
-                                <CardContent className="p-3 md:p-4 flex items-center gap-3">
-                                    <Clock className="w-4 h-4 md:w-5 md:h-5 text-primary" />
-                                    <div>
-                                        <p className="text-xs text-muted-foreground">Read Time</p>
-                                        <p className="text-sm md:text-base font-medium">{summary.estimatedReadTime}</p>
-                                    </div>
-                                </CardContent>
-                            </Card>
-                            <Card className="bg-card border-border card-elevated">
-                                <CardContent className="p-3 md:p-4 flex items-center gap-3">
-                                    <BookOpen className="w-4 h-4 md:w-5 md:h-5 text-warning" />
-                                    <div>
-                                        <p className="text-xs text-muted-foreground">Topics</p>
-                                        <p className="text-sm md:text-base font-medium">{summary.topics.length} covered</p>
-                                    </div>
-                                </CardContent>
-                            </Card>
-                        </div>
+                     <div className="grid gap-3 md:gap-4">
 
                         {/* Overview */}
                          <Card className="bg-card border-border card-elevated">
@@ -324,28 +284,6 @@ const Summary: React.FC = () => {
                               </CardContent>
                           </Card>
                         */}
-
-                        {/* Topics */}
-                        <Card className="bg-card border-border card-elevated">
-                            <CardHeader className="pb-3 p-4 md:p-6 md:pb-3">
-                                <CardTitle className="text-base md:text-lg flex items-center gap-2">
-                                    <BookOpen className="w-4 h-4 md:w-5 md:h-5 text-primary" />
-                                    Topics Covered
-                                </CardTitle>
-                            </CardHeader>
-                            <CardContent className="p-4 md:p-6 pt-0 md:pt-0">
-                                <div className="flex flex-wrap gap-2">
-                                    {summary.topics.map((topic, idx) => (
-                                        <span
-                                            key={idx}
-                                            className="px-3 py-1.5 rounded-full bg-secondary text-xs md:text-sm font-medium text-foreground"
-                                        >
-                                            {topic}
-                                        </span>
-                                    ))}
-                                </div>
-                            </CardContent>
-                        </Card>
 
                         <Separator className="my-2" />
 
