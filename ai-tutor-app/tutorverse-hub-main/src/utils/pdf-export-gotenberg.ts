@@ -122,10 +122,12 @@ export const exportElementToPDFGotenberg = async (
       header.remove();
     });
     
-    // Also remove any subtitle paragraphs (text-muted-foreground, mt-1, etc.)
+    // Also remove only subtitle paragraphs with muted-foreground (not all text-sm)
     clonedElement.querySelectorAll('p').forEach((p) => {
       const classes = p.className || '';
-      if (classes.includes('muted-foreground') || classes.includes('text-sm')) {
+      const text = p.textContent?.trim() || '';
+      // Only remove if it's a muted/secondary paragraph with very short content (like module code)
+      if (classes.includes('muted-foreground') && text.length < 50) {
         p.remove();
       }
     });
