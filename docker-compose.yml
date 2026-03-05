@@ -43,6 +43,7 @@ services:
       - RAG_TIMEOUT=180000
       - RAG_RETRY_ATTEMPTS=3
       - RAG_RETRY_DELAY_MS=2000
+      - GOTENBERG_URL=http://gotenberg:3000
     env_file:
       - ./ai-tutor-app/backend/.env
     depends_on:

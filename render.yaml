@@ -62,8 +62,12 @@ services:
          value: '180000'
        - key: RAG_RETRY_ATTEMPTS
          value: '3'
+       - key: GOTENBERG_URL
+         value: 'http://gotenberg:3000'
+         sync: false
+         # IMPORTANT: Gotenberg must be deployed separately or use external service
 
-  # Frontend Service (DEPLOY THIRD)
+       # Frontend Service (DEPLOY THIRD)
    - type: web
      name: ai-tutor
      runtime: docker
