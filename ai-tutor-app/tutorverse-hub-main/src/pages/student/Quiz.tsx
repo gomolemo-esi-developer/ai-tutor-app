@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useRef } from "react";
 import { useParams, useNavigate, useSearchParams } from "react-router-dom";
 import { ArrowLeft, BookOpen, CheckCircle2, FileText } from "lucide-react";
 import MainLayout from "@/components/layout/MainLayout";
@@ -168,6 +168,9 @@ const Quiz: React.FC = () => {
   const [answers, setAnswers] = useState<Record<string, string>>({});
   const [questions, setQuestions] = useState<Question[]>([]);
   const [quizId, setQuizId] = useState<string | null>(null);
+  
+  // Track if we've already initiated quiz generation to prevent duplicate requests
+  const quizInitiatedRef = useRef(false);
 
   const { post: postQuiz, loading } = useApi<Question[]>();
 
@@ -183,7 +186,14 @@ const Quiz: React.FC = () => {
   useEffect(() => {
      let isMounted = true;
      
+     // Prevent duplicate quiz generation requests
+     if (quizInitiatedRef.current) {
+       return;
+     }
+     
      if (contentIds || selectedContent.length > 0) {
+       quizInitiatedRef.current = true;
+       
        fetchQuestions().then(() => {
          if (isMounted) {
            // Response already handled in fetchQuestions

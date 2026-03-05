@@ -351,13 +351,17 @@ export class RAGService {
             throw new Error('At least one document ID required for quiz generation');
         }
 
+        // Quiz generation can take longer - use extended timeout (max 5 minutes)
+        const quizTimeout = Math.max(this.config.timeout, 5 * 60 * 1000);
+
         for (let attempt = 1; attempt <= this.config.retryAttempts; attempt++) {
             try {
                 LoggerUtil.info(`[RAG] Quiz attempt ${attempt}/${this.config.retryAttempts}`, {
                     moduleId,
                     contentId,
                     numQuestions,
-                    documentCount: documentIds.length
+                    documentCount: documentIds.length,
+                    timeoutMs: quizTimeout
                 });
 
                 const response = await this.client.post('/quiz/generate', {
@@ -367,6 +371,8 @@ export class RAGService {
                     numQuestions,
                     title: title || `Quiz for ${contentId}`,
                     questionTypes: ['single-select', 'multi-select', 'fill-blank', 'true-false']
+                }, {
+                    timeout: quizTimeout
                 });
 
                 LoggerUtil.info('[RAG] Quiz generated', {
@@ -381,7 +387,9 @@ export class RAGService {
                 });
 
                 if (attempt < this.config.retryAttempts) {
-                    const delay = this.config.retryDelayMs * Math.pow(2, attempt - 1);
+                    // Use longer delay for quiz generation retries
+                    const delay = Math.min(this.config.retryDelayMs * Math.pow(2, attempt - 1), 10000);
+                    LoggerUtil.info(`[RAG] Retrying quiz generation in ${delay}ms`, { moduleId });
                     await new Promise(resolve => setTimeout(resolve, delay));
                 } else {
                     throw error;
