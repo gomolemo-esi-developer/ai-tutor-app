@@ -1,5 +1,20 @@
 services:
-  # RAG Service (DEPLOY FIRST - Backend Dependency)
+   # Gotenberg Service (DEPLOY FIRST - Backend Dependency for PDF generation)
+   - type: web
+     name: tutorverse-gotenberg
+     runtime: docker
+     image: gotenberg/gotenberg:7
+     region: oregon
+     plan: standard
+     autoDeploy: false
+     healthCheckPath: /health
+     healthCheckStartPeriod: 10
+     envVars:
+       - key: LOG_LEVEL
+         value: error
+     # Service URL: https://tutorverse-gotenberg.onrender.com
+
+   # RAG Service (DEPLOY SECOND - Backend Dependency)
   - type: web
     name: tutorverse-rag
     runtime: docker
@@ -63,9 +78,8 @@ services:
        - key: RAG_RETRY_ATTEMPTS
          value: '3'
        - key: GOTENBERG_URL
-         value: 'http://gotenberg:3000'
-         sync: false
-         # IMPORTANT: Gotenberg must be deployed separately or use external service
+        value: 'https://tutorverse-gotenberg.onrender.com'
+        sync: false
 
        # Frontend Service (DEPLOY THIRD)
    - type: web
