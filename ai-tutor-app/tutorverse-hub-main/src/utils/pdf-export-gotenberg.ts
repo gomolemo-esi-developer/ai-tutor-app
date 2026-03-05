@@ -132,27 +132,30 @@ export const exportElementToPDFGotenberg = async (
       }
     });
 
-    // Step 4: Flatten wrapper divs and convert Tailwind classes to inline styles
+    // Step 4: Remove non-essential styling but preserve flex for content layout
     const allDivs = Array.from(clonedElement.querySelectorAll('div'));
     allDivs.forEach((div) => {
       const classes = div.className || '';
       
-      // Remove Tailwind spacing classes and set inline styles instead
-      div.classList.remove('grid', 'gap-3', 'gap-4', 'md:gap-3', 'md:gap-4');
+      // Remove unnecessary responsive/spacing classes
+      div.classList.remove('gap-3', 'gap-4', 'md:gap-3', 'md:gap-4');
       div.classList.remove('mb-3', 'mb-4', 'mb-6', 'mt-1', 'mt-4', 'mt-6');
-      div.classList.remove('flex', 'flex-col', 'flex-row', 'items-center', 'justify-center');
       div.classList.remove('p-4', 'p-6', 'py-4', 'px-4');
+      div.classList.remove('items-center', 'justify-center', 'md:gap-3');
       
-      // If it was a grid, make it a simple block
-      if (classes.includes('grid')) {
+      // Keep flex/grid for layout, but convert to block if it's just a wrapper
+      if (classes.includes('grid') && !classes.includes('border-l')) {
         div.style.display = 'block';
-        div.style.marginTop = '0';
-        div.style.marginBottom = '0';
       }
     });
 
-    // Step 5: Remove separators
-    clonedElement.querySelectorAll('[class*="separator"], [class*="Separator"]').forEach((sep) => sep.remove());
+    // Step 5: Remove separators (but keep badges/tags)
+    clonedElement.querySelectorAll('[class*="separator"], [class*="Separator"]')
+      .forEach((sep) => {
+        if (!sep.className?.includes('rounded-full') && !sep.className?.includes('badge')) {
+          sep.remove();
+        }
+      });
 
     // Step 6: Remove metadata and extra sections, but keep main content CardContent
     clonedElement.querySelectorAll('[class*="Card"]').forEach((card) => {
@@ -174,20 +177,22 @@ export const exportElementToPDFGotenberg = async (
       }
     });
 
-    // Step 8: Remove truly empty wrapper divs (but keep those with content)
+    // Step 8: Remove truly empty wrapper divs (but keep those with content and answer sections)
     const emptyDivs = Array.from(clonedElement.querySelectorAll('div'));
     emptyDivs.forEach((div) => {
       const text = div.textContent?.trim() || '';
       const hasChildren = div.children.length > 0;
+      const isAnswerSection = div.className?.includes('grid') || div.className?.includes('flex');
       
-      // Only remove if completely empty
-      if (!text && !hasChildren) {
+      // Only remove if completely empty AND not part of answer layout
+      if (!text && !hasChildren && !isAnswerSection) {
         div.remove();
       }
     });
 
     // Get the outer HTML
     const html = clonedElement.outerHTML;
+    console.log('HTML being sent to PDF:', html); // DEBUG
 
     // Send to Gotenberg
     await exportHTMLToPDFGotenberg(html, options);

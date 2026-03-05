@@ -31,9 +31,11 @@ const QuizResults: React.FC = () => {
       const parsed = JSON.parse(storedResults);
       // Ensure results is always an array
       if (Array.isArray(parsed)) {
+        console.log('Quiz types:', parsed.map(p => p.type)); // DEBUG
         setResults(parsed);
       } else if (parsed && typeof parsed === 'object') {
         // If it's a single result object, wrap it in an array
+        console.log('Single quiz type:', parsed.type); // DEBUG
         setResults([parsed]);
       } else {
         navigate(`/modules/${moduleCode}/quiz?contentIds=${contentIds}`);
@@ -174,12 +176,29 @@ const QuizResults: React.FC = () => {
                         </p>
                         <span className="flex-shrink-0 text-xs px-2 py-1 rounded-full bg-muted text-muted-foreground self-start">
                           {result.type === 'multiple-choice' && 'Multiple Choice'}
+                          {result.type === 'multipleChoice' && 'Multiple Choice'}
                           {result.type === 'true-false' && 'True/False'}
+                          {result.type === 'trueFalse' && 'True/False'}
                           {result.type === 'fill-blank' && 'Fill in the Blank'}
+                          {result.type === 'fillBlank' && 'Fill in the Blank'}
+                          {!['multiple-choice', 'multipleChoice', 'true-false', 'trueFalse', 'fill-blank', 'fillBlank'].includes(result.type) && result.type}
                         </span>
                       </div>
 
                       <div className="grid gap-2 text-xs md:text-sm">
+                        {/* Show options for multiple choice questions */}
+                        {result.type === 'multiple-choice' && result.options && result.options.length > 0 && (
+                          <div className="mb-2">
+                            <p className="text-muted-foreground font-medium mb-1">Options:</p>
+                            <ul className="list-disc list-inside space-y-1">
+                              {result.options.map((option, idx) => (
+                                <li key={idx} className="text-foreground">
+                                  {option}
+                                </li>
+                              ))}
+                            </ul>
+                          </div>
+                        )}
                         <div className="flex flex-col sm:flex-row sm:items-center gap-1 sm:gap-2">
                           <span className="text-muted-foreground sm:w-28">
                             Your answer:
