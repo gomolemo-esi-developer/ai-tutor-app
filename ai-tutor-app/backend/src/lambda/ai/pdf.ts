@@ -2,7 +2,7 @@ import axios from 'axios';
 import { APIGatewayProxyHandler } from 'aws-lambda';
 import FormData from 'form-data';
 
-const GOTENBERG_URL = process.env.GOTENBERG_URL || 'http://localhost:3001';
+const GOTENBERG_URL = process.env.GOTENBERG_URL || 'http://gotenberg:3000';
 
 interface PDFRequest {
   html: string;
