@@ -94,11 +94,13 @@ services:
       - "3001:3000"
     environment:
       - LOG_LEVEL=error
+      - GOTENBERG_CHROMIUM_DISABLE_GPU=true
+      - GOTENBERG_CHROMIUM_INCOGNITO=true
     networks:
       - tutorverse
     restart: unless-stopped
-    mem_limit: 512m
-    memswap_limit: 512m
+    mem_limit: 1g
+    memswap_limit: 1g
     logging:
       driver: "json-file"
       options:

@@ -29,13 +29,16 @@ export const PDFDownloadButton: React.FC<PDFDownloadButtonProps> = ({
     const handleDownload = async () => {
         try {
             setIsLoading(true);
+            toast.loading('Preparing PDF... This may take up to 2 minutes for large quizzes.');
             await exportElementToPDFGotenberg(elementId, {
                 filename,
                 title,
             });
+            toast.dismiss(); // Clear the loading toast
             toast.success('PDF downloaded successfully!');
         } catch (error) {
             console.error('PDF export error:', error);
+            toast.dismiss(); // Clear the loading toast
 
             const errorMsg = error instanceof Error ? error.message : String(error);
             
@@ -44,11 +47,16 @@ export const PDFDownloadButton: React.FC<PDFDownloadButtonProps> = ({
                 toast.error('You must be logged in to download PDF');
             } else if (errorMsg.includes('Network') || errorMsg.includes('REFUSED') || errorMsg.includes('ERR_CONNECTION') || errorMsg.includes('ERR_NETWORK')) {
                 toast.error(
-                    'PDF service is not available. To use PDF export, start Gotenberg with: docker run -d -p 3001:3000 gotenberg/gotenberg:7',
+                    'PDF service is not available. Ensure Gotenberg is running.',
                     { duration: 6000 }
                 );
             } else if (errorMsg.includes('401') || errorMsg.includes('Unauthorized')) {
                 toast.error('Authentication failed. Please log in again.');
+            } else if (errorMsg.includes('timeout')) {
+                toast.error(
+                    'PDF generation took too long. Try downloading a quiz with fewer questions, or contact support.',
+                    { duration: 8000 }
+                );
             } else {
                 toast.error(
                     error instanceof Error ? error.message : 'Failed to download PDF'

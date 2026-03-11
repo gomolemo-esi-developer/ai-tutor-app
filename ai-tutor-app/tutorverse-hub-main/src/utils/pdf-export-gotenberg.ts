@@ -66,7 +66,7 @@ async function generatePDFViaBackend(
     },
     {
       responseType: 'arraybuffer',
-      timeout: 30000, // 30 seconds - most quizzes generate in 5-10s
+      timeout: 150000, // 150 seconds - accounts for backend 120s + network latency
       headers: {
         'Authorization': `Bearer ${token}`,
         'Content-Type': 'application/json',
@@ -94,7 +94,7 @@ function downloadPDF(pdfData: ArrayBuffer, filename: string): void {
 
 /**
  * Export a DOM element to PDF using Gotenberg
- * OPTIMIZED: Single-pass DOM traversal instead of multiple querySelectorAll calls
+ * OPTIMIZED: Strip all unnecessary attributes to reduce payload size
  */
 export const exportElementToPDFGotenberg = async (
   elementId: string,
@@ -109,16 +109,15 @@ export const exportElementToPDFGotenberg = async (
     // Clone the element to avoid modifying the original
     const clonedElement = element.cloneNode(true) as HTMLElement;
 
-    // OPTIMIZED: Single-pass DOM cleaning with stack-based tree walk
+    // OPTIMIZED: Single-pass DOM cleaning + aggressive payload reduction
     const elementsToRemove: Element[] = [];
     const nodesToWalk = [clonedElement];
-    const classesToRemove = ['gap-3', 'gap-4', 'md:gap-3', 'md:gap-4', 'mb-3', 'mb-4', 'mb-6', 'mt-1', 'mt-4', 'mt-6', 'p-4', 'p-6', 'py-4', 'px-4', 'items-center', 'justify-center'];
     
     while (nodesToWalk.length > 0) {
       const node = nodesToWalk.pop();
       if (!node) continue;
 
-      // Remove buttons and SVGs
+      // Remove buttons and SVGs immediately
       if (node instanceof HTMLButtonElement || node instanceof SVGElement) {
         elementsToRemove.push(node);
         continue;
@@ -130,7 +129,7 @@ export const exportElementToPDFGotenberg = async (
         continue;
       }
 
-      // Check paragraphs
+      // Check paragraphs for muted text (like module codes)
       if (node instanceof HTMLParagraphElement) {
         const classes = node.className || '';
         const text = node.textContent?.trim() || '';
@@ -173,16 +172,31 @@ export const exportElementToPDFGotenberg = async (
           continue;
         }
 
-        // Clean up unnecessary classes
-        classesToRemove.forEach(cls => node.classList.remove(cls));
+        // AGGRESSIVE OPTIMIZATION: Strip all unnecessary Tailwind classes
+        const newClasses = Array.from(node.classList)
+          .filter(cls => 
+            // Keep only essential classes
+            cls.includes('border-l') ||
+            cls.includes('bg-') ||
+            cls.includes('text-') ||
+            cls.includes('font-') ||
+            cls.includes('rounded') ||
+            cls.includes('flex') ||
+            cls.includes('grid') ||
+            cls.includes('space-') ||
+            cls === 'print:block'
+          )
+          .join(' ');
         
-        // Convert non-border-l grids to block
-        if (classes.includes('grid') && !classes.includes('border-l')) {
-          node.style.display = 'block';
+        node.className = newClasses;
+        
+        // Remove inline styles except display changes
+        if (!classes.includes('border-l')) {
+          node.style.cssText = '';
         }
       }
 
-      // Add children to walk queue (reversed for correct order)
+      // Add children to walk queue
       for (let i = node.childNodes.length - 1; i >= 0; i--) {
         const child = node.childNodes[i];
         if (child instanceof Element) {
@@ -195,8 +209,11 @@ export const exportElementToPDFGotenberg = async (
     elementsToRemove.forEach(el => el.remove());
 
     // Get the outer HTML
-    const html = clonedElement.outerHTML;
-
+    let html = clonedElement.outerHTML;
+    
+    // FINAL OPTIMIZATION: Remove data attributes (often bloated)
+    html = html.replace(/\s+data-[^\s=]*(?:="[^"]*")?/g, '');
+    
     // Send to Gotenberg
     await exportHTMLToPDFGotenberg(html, options);
   } catch (error) {

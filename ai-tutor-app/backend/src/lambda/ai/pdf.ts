@@ -58,7 +58,7 @@ export const handler: APIGatewayProxyHandler = async (event) => {
       {
         responseType: 'arraybuffer',
         headers: formData.getHeaders(),
-        timeout: 60000,
+        timeout: 120000, // Increased to 120s for slow quiz PDFs with many questions
       }
     );
 
