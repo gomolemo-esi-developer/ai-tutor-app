@@ -58,6 +58,7 @@ export const exportHTMLToPDFGotenberg = async (
 /**
  * Generate PDF through backend to avoid CORS issues
  * Uses JWT token stored in localStorage for authentication
+ * Uses fetch API directly to avoid any axios timeout issues
  */
 async function generatePDFViaBackend(
   html: string,
@@ -72,25 +73,32 @@ async function generatePDFViaBackend(
 
   const apiClient = createGlobalApiClient();
   const backendURL = apiClient.getBaseURL();
-  const pdfAxios = createPDFAxiosInstance();
   
-  const response = await pdfAxios.post(
-    `${backendURL}/api/pdf/generate`,
-    {
-      html,
-      filename: options.filename,
-      title: options.title,
-    },
-    {
-      responseType: 'arraybuffer',
+  try {
+    const response = await fetch(`${backendURL}/api/pdf/generate`, {
+      method: 'POST',
       headers: {
         'Authorization': `Bearer ${token}`,
         'Content-Type': 'application/json',
       },
-    }
-  );
+      body: JSON.stringify({
+        html,
+        filename: options.filename,
+        title: options.title,
+      }),
+      // No timeout on fetch - let it wait indefinitely
+    });
 
-  downloadPDF(response.data, options.filename);
+    if (!response.ok) {
+      const errorText = await response.text();
+      throw new Error(`PDF generation failed: ${response.status} ${errorText}`);
+    }
+
+    const blob = await response.arrayBuffer();
+    downloadPDF(blob, options.filename);
+  } catch (error) {
+    throw error instanceof Error ? error : new Error(String(error));
+  }
 }
 
 /**
