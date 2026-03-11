@@ -1,4 +1,4 @@
-import axios from 'axios';
+import axios, { AxiosInstance } from 'axios';
 import { createGlobalApiClient } from '@/services/apiClient';
 
 interface PDFExportOptions {
@@ -12,6 +12,22 @@ interface PDFExportOptions {
  * In production (Docker): http://gotenberg:3000
  */
 const GOTENBERG_URL = import.meta.env.VITE_GOTENBERG_URL || 'http://localhost:3001';
+
+/**
+ * Create a dedicated axios instance for PDF requests with long timeout
+ * Gotenberg on Render.com can take 60-120+ seconds
+ * Setting to 0 means no timeout limit
+ */
+const createPDFAxiosInstance = (): AxiosInstance => {
+  const instance = axios.create({
+    timeout: 0, // No timeout - let backend/Render handle it
+  });
+  
+  // Explicitly override any defaults that might have been set globally
+  instance.defaults.timeout = 0;
+  
+  return instance;
+};
 
 /**
  * Convert HTML to PDF using Gotenberg API - OPTIMIZED VERSION
@@ -56,8 +72,9 @@ async function generatePDFViaBackend(
 
   const apiClient = createGlobalApiClient();
   const backendURL = apiClient.getBaseURL();
+  const pdfAxios = createPDFAxiosInstance();
   
-  const response = await axios.post(
+  const response = await pdfAxios.post(
     `${backendURL}/api/pdf/generate`,
     {
       html,
@@ -66,7 +83,6 @@ async function generatePDFViaBackend(
     },
     {
       responseType: 'arraybuffer',
-      timeout: 200000, // 200 seconds - Gotenberg on Render.com + network overhead
       headers: {
         'Authorization': `Bearer ${token}`,
         'Content-Type': 'application/json',
