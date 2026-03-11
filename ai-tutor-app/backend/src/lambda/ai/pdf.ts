@@ -17,13 +17,19 @@ interface PDFRequest {
 export const handler: APIGatewayProxyHandler = async (event) => {
   try {
     const body = JSON.parse(event.body || '{}') as PDFRequest;
-    const { html, filename = 'document.pdf', title } = body;
+    let { html, filename = 'document.pdf', title } = body;
 
     if (!html) {
       return {
         statusCode: 400,
         body: JSON.stringify({ error: 'HTML content is required' }),
       };
+    }
+
+    // Sanitize filename - remove invalid characters and newlines
+    filename = filename.replace(/[\r\n"]/g, '').replace(/[<>:"/\\|?*]/g, '_').slice(0, 255);
+    if (!filename || filename === '') {
+      filename = 'document.pdf';
     }
 
     // Create FormData for Gotenberg using form-data package (Node.js compatible)
