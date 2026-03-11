@@ -66,7 +66,7 @@ async function generatePDFViaBackend(
     },
     {
       responseType: 'arraybuffer',
-      timeout: 150000, // 150 seconds - accounts for backend 120s + network latency
+      timeout: 200000, // 200 seconds - Gotenberg on Render.com + network overhead
       headers: {
         'Authorization': `Bearer ${token}`,
         'Content-Type': 'application/json',

@@ -29,7 +29,7 @@ export const PDFDownloadButton: React.FC<PDFDownloadButtonProps> = ({
     const handleDownload = async () => {
         try {
             setIsLoading(true);
-            toast.loading('Preparing PDF... This may take up to 2 minutes for large quizzes.');
+            toast.loading('Generating PDF... Please wait. This may take up to 3 minutes for large quizzes.', { duration: Infinity });
             await exportElementToPDFGotenberg(elementId, {
                 filename,
                 title,
@@ -47,15 +47,15 @@ export const PDFDownloadButton: React.FC<PDFDownloadButtonProps> = ({
                 toast.error('You must be logged in to download PDF');
             } else if (errorMsg.includes('Network') || errorMsg.includes('REFUSED') || errorMsg.includes('ERR_CONNECTION') || errorMsg.includes('ERR_NETWORK')) {
                 toast.error(
-                    'PDF service is not available. Ensure Gotenberg is running.',
+                    'PDF service is unavailable. Please try again in a few moments.',
                     { duration: 6000 }
                 );
             } else if (errorMsg.includes('401') || errorMsg.includes('Unauthorized')) {
                 toast.error('Authentication failed. Please log in again.');
             } else if (errorMsg.includes('timeout')) {
                 toast.error(
-                    'PDF generation took too long. Try downloading a quiz with fewer questions, or contact support.',
-                    { duration: 8000 }
+                    'PDF generation exceeded 3 minutes. Please try again or contact support if the issue persists.',
+                    { duration: 10000 }
                 );
             } else {
                 toast.error(
